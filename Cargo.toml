@@ -1,0 +1,14 @@
+[package]
+name = "disas"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+elf = "0.7.1"
+tui = "0.19.0"
+log = {version = "0.4", features = ["max_level_debug", "release_max_level_warn"]}
+env_logger = "0.9.0"
+memmap = "0.7.0"
+crossterm = "0.25"
