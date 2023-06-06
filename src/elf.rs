@@ -2,6 +2,7 @@ use elf::ElfBytes;
 use elf::endian::AnyEndian;
 use elf::file::*;
 use elf::symbol::Symbol;
+use elf::section::SectionHeaderTable;
 
 pub struct Functions<'a> {
     list: Vec<(&'a str, Symbol)>,
@@ -12,7 +13,7 @@ impl<'a> Functions<'a> {
         Self { list: list }
     }
 
-    // refs didn't work.... I am too dumb  at rust
+    // refs didn't work.... I am too dumbat rust
     pub fn names(&self) -> Vec<String> {
         self.list.iter().map(|x| x.0.to_owned()).collect()
     }
@@ -20,6 +21,7 @@ impl<'a> Functions<'a> {
 
 pub struct Elf<'a> {
    data: ElfBytes::<'a, AnyEndian>,
+   sections: Option<SectionHeaderTable<'a, AnyEndian>>,
 }
 
 impl<'a> Elf<'a> {
@@ -34,7 +36,18 @@ impl<'a> Elf<'a> {
 
         Self::check_header(&data)?;
 
-        Some(Self {data: data} )
+        Some(Self {data: data, sections: None} )
+    }
+
+    pub fn get_raw_section(&self, idx: usize) -> Option<&'a [u8]> {
+        let s = self.sections.unwrap().get(idx).ok()?;
+
+        Some(self.data.section_data(&s).ok()?.0)
+    }
+
+    pub fn load_sections(&mut self) -> Option<()> {
+        self.sections = Some(self.data.section_headers()?);
+        Some(())
     }
 
     pub fn check_header(e: &ElfBytes<AnyEndian>) -> Option<()> {

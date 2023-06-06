@@ -35,10 +35,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "capstone"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1097e608594dad3bad608295567f757742b883606fe150faf7a9740b849730d8"
+dependencies = [
+ "capstone-sys",
+ "libc",
+]
+
+[[package]]
+name = "capstone-sys"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e7f651d5ec4c2a2e6c508f2c8032655003cd728ec85663e9796616990e25b5a"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
+
+[[package]]
+name = "cc"
+version = "1.0.79"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
 
 [[package]]
 name = "cfg-if"
@@ -75,6 +101,7 @@ dependencies = [
 name = "disas"
 version = "0.1.0"
 dependencies = [
+ "capstone",
  "crossterm",
  "elf",
  "env_logger",

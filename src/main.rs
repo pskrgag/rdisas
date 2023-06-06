@@ -6,9 +6,11 @@ use memmap::MmapOptions;
 mod disas;
 mod elf;
 mod term;
+mod events;
 
 #[macro_use]
 extern crate log;
+extern crate capstone;
 
 fn main() {
     env_logger::init();
