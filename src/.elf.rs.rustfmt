@@ -1,6 +1,6 @@
 use elf::endian::AnyEndian;
 use elf::file::*;
-use elf::section::{SectionHeaderTable, SectionHeader};
+use elf::section::SectionHeaderTable;
 use elf::symbol::Symbol;
 use elf::ElfBytes;
 
@@ -20,6 +20,7 @@ impl<'a> Functions<'a> {
 }
 
 pub struct Elf<'a> {
+    object: bool,
     data: ElfBytes<'a, AnyEndian>,
     sections: Option<SectionHeaderTable<'a, AnyEndian>>,
 }
@@ -126,28 +127,32 @@ impl<'a> Elf<'a> {
             .expect("Failed to get symbol table")
             .unwrap();
 
+        let mut data = None;
 
         for i in symtab {
-            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
-                let data = Some((i.st_value, i.st_shndx));
-                let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
-
-                let start = (i.st_value - target_section.sh_addr) as usize;
-                let end = start + i.st_size as usize;
-
+            if let Some((s, _)) = data {
                 return &self
                     .data
-                    .section_data(target_section).unwrap()
-                    .0[start..end];
+                    .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
+                    .unwrap()
+                    .0[s as usize..i.st_value as usize];
+            }
+
+            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
+                    data = Some((i.st_value, i.st_shndx));
             }
         }
 
-        todo!()
+        return &self
+            .data
+            .section_data(
+                &self
+                    .sections
+                    .unwrap()
+                    .get(data.unwrap().1 as usize)
+                    .unwrap(),
+            )
+            .unwrap()
+            .0[data.unwrap().0 as usize..];
     }
-
-    fn section_name(&self, s: &SectionHeader) {
-        let sh = self.data.section_header_by_name(".shstrtab").unwrap().unwrap();
-        println!("section {:?}", std::str::from_utf8(&self.data.section_data(&sh).unwrap().0[s.sh_name as usize..]));
-    }
-
 }

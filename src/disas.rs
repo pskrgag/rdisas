@@ -1,6 +1,8 @@
 use crate::elf::{Elf, Functions};
-use crate::term::Term;
-use crate::events::{wait_event, KeyboardEvent};
+use crate::term::{
+    events::{wait_event, KeyboardEvent},
+    term::Term,
+};
 
 pub enum State {
     Control,
@@ -13,6 +15,16 @@ pub struct Disas<'a> {
     elf: Elf<'a>,
     t: Term,
     state: State,
+}
+
+pub struct GlobalState<'a> {
+    pub(crate) elf: &'a Elf<'a>,
+}
+
+impl<'a> GlobalState<'a> {
+    pub fn elf(&self) -> &'a Elf<'a> {
+        self.elf
+    }
 }
 
 impl<'a> Disas<'a> {
@@ -32,20 +44,26 @@ impl<'a> Disas<'a> {
     pub fn exec(&mut self) {
         info!("Starting main loop");
 
-        self.t.setup(format!("Disassembly for {}", self.file).as_str());
+        self.t
+            .setup(format!("Disassembly for {}", self.file).as_str());
 
-        let f = self.elf.function_names().expect("Failed to get funtion names");
+        let f = self
+            .elf
+            .function_names()
+            .expect("Failed to get funtion names");
 
         self.t.draw_func_list(f.names());
 
-        loop { 
+        loop {
             let e = wait_event(&self.state);
 
             match e {
                 KeyboardEvent::Next => self.t.next_elem(),
                 KeyboardEvent::Prev => self.t.prev_elem(),
+                KeyboardEvent::Enter => self.t.go_in(GlobalState { elf: &self.elf }),
+                KeyboardEvent::PrevFrame => self.t.prev_frame(),
                 KeyboardEvent::Exit => break,
-                _ => {},
+                _ => {}
             }
         }
     }

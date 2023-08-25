@@ -1,12 +1,12 @@
 #![feature(slice_pattern)]
 
-use std::env;
 use memmap::MmapOptions;
+use std::env;
 
 mod disas;
 mod elf;
+mod elf_disas;
 mod term;
-mod events;
 
 #[macro_use]
 extern crate log;
@@ -28,7 +28,8 @@ fn main() {
             error!("Failed to open {}: {}", args[1], e);
             None
         }
-    }.unwrap();
+    }
+    .unwrap();
 
     let mmap_data = match unsafe { MmapOptions::new().map(&file) } {
         Ok(f) => Some(f),
@@ -36,7 +37,8 @@ fn main() {
             error!("Failed to map {}: {}", args[1], e);
             None
         }
-    }.unwrap();
+    }
+    .unwrap();
 
     let e = match elf::Elf::new(&*mmap_data) {
         Some(e) => Some(e),
@@ -44,7 +46,8 @@ fn main() {
             error!("Failed to create elf");
             None
         }
-    }.unwrap();
+    }
+    .unwrap();
 
     let mut d = disas::Disas::new(args[1].clone(), e).unwrap();
 
