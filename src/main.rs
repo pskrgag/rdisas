@@ -1,3 +1,5 @@
+#![feature(return_position_impl_trait_in_trait)]
+
 use memmap::MmapOptions;
 use std::env;
 
@@ -8,9 +10,6 @@ mod term;
 #[macro_use]
 extern crate log;
 extern crate capstone;
-
-#[macro_use]
-extern crate lazy_static;
 
 fn main() {
     env_logger::init();

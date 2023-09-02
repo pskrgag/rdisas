@@ -1,10 +1,7 @@
-use std::any::Any;
 use tui::{
-    widgets::ListState,
-    Frame,
+    widgets::{ListState, List},
 };
 use crate::disas::GlobalState;
-use crate::term::term::Backend;
 
 pub mod func_asm;
 pub mod func_list;
@@ -18,10 +15,10 @@ pub enum ItemType {
 }
 
 impl ScreenItem for ItemType {
-    fn go_in(&self, f: &mut Frame<Backend>, s: &GlobalState) -> Option<ItemType> {
+    fn go_in(&self, s: &GlobalState) -> Option<ItemType> {
         match self {
-            Self::FunctionList(e) => e.go_in(f, s),
-            Self::FunctionDisas(e) => e.go_in(f, s),
+            Self::FunctionList(e) => e.go_in(s),
+            Self::FunctionDisas(e) => e.go_in(s),
         }
     }
 
@@ -39,39 +36,36 @@ impl ScreenItem for ItemType {
         }
     }
 
-    fn draw(&mut self, f: &mut Frame<Backend>) {
+    fn draw(&mut self) -> (List, &mut ListState) {
         match self {
-            Self::FunctionList(s) => s.draw(f),
-            Self::FunctionDisas(s) => s.draw(f),
+            Self::FunctionList(s) => s.draw(),
+            Self::FunctionDisas(s) => s.draw(),
         }
     }
 }
 
-
 pub trait ScreenItem {
     fn list_size(&self) -> usize;
     fn state(&mut self) -> &mut ListState;
-    fn draw(&mut self, f: &mut Frame<Backend>);
-    fn go_in(&self, f: &mut Frame<Backend>, s: &GlobalState) -> Option<ItemType>;
+    fn draw(&mut self) -> (List, &mut ListState);
+    fn go_in(&self, s: &GlobalState) -> Option<ItemType>;
 
-    fn next(&mut self, f: &mut Frame<Backend>) {
+    fn next(&mut self) {
         let size = self.list_size();
         let s = self.state();
         let selected = s.selected().unwrap();
 
         s.select(Some(next_state(size, selected)));
-        self.draw(f);
     }
 
-    fn prev(&mut self, f: &mut Frame<Backend>) {
+    fn prev(&mut self) {
         let size = self.list_size();
         let s = self.state();
         let selected = s.selected().unwrap();
 
+        log_info!("Hello world!\n");
         s.select(Some(prev_state(size, selected)));
-        self.draw(f);
     }
-
 }
 
 // Helper functions

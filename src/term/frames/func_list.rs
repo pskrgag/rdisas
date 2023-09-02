@@ -1,11 +1,7 @@
 use crate::disas::GlobalState;
-use crate::term::term::Backend;
-use std::any::Any;
 use tui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Widget},
-    Frame, Terminal,
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState},
 };
 use super::func_asm::FuncAsm;
 use super::{ScreenItem, ItemType};
@@ -25,7 +21,7 @@ impl FuncList {
 }
 
 impl ScreenItem for FuncList {
-    fn draw(&mut self, f: &mut Frame<Backend>) {
+    fn draw(&mut self) -> (List, &mut ListState) {
         let items: Vec<ListItem> = self.list.iter().map(|i| ListItem::new(&**i)).collect();
         let list = List::new(items)
             .block(
@@ -36,7 +32,7 @@ impl ScreenItem for FuncList {
             .style(Style::default().fg(Color::White))
             .highlight_style(Style::default().bg(Color::Blue));
 
-        f.render_stateful_widget(list, f.size(), &mut self.state);
+        (list, &mut self.state)
     }
 
     fn state(&mut self) -> &mut ListState {
@@ -47,11 +43,10 @@ impl ScreenItem for FuncList {
         self.list.len()
     }
 
-    fn go_in(&self, f: &mut Frame<Backend>, state: &GlobalState) -> Option<ItemType> {
+    fn go_in(&self, state: &GlobalState) -> Option<ItemType> {
         let s = self.state.selected().unwrap();
-        let mut new = FuncAsm::new(&self.list[s], &state);
+        let new = FuncAsm::new(&self.list[s], &state);
 
-        new.draw(f);
         Some(ItemType::FunctionDisas(new))
     }
 }

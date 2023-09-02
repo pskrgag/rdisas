@@ -97,7 +97,7 @@ impl Elf {
         match self.data.ehdr.e_type {
             elf::abi::ET_REL => self.func_code_reloc(name),
             elf::abi::ET_DYN | elf::abi::ET_EXEC => self.func_code_exe(name),
-            _ => unsafe { unreachable!() },
+            _ => unreachable!(),
         }
     }
 
@@ -113,6 +113,9 @@ impl Elf {
         for i in symtab {
             if i.st_symtype() == ELF_SYM_STT_FUNC {
                 if strtab.get(i.st_name as usize).unwrap() == name {
+
+                    crate::log_info!("Found {} at addr {}", name, i.st_value);
+
                     return &self
                         .data
                         .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())

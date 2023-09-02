@@ -1,11 +1,9 @@
 use super::{ItemType, ScreenItem};
 use crate::disas::GlobalState;
-use crate::term::term::Backend;
 use capstone::Instructions;
 use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
-    Frame,
 };
 
 pub struct FuncAsm {
@@ -26,7 +24,7 @@ impl FuncAsm {
 }
 
 impl ScreenItem for FuncAsm {
-    fn draw(&mut self, f: &mut Frame<Backend>) {
+    fn draw(&mut self) -> (List, &mut ListState) {
         let items: Vec<ListItem> = self
             .list
             .iter()
@@ -42,7 +40,7 @@ impl ScreenItem for FuncAsm {
             .style(Style::default().fg(Color::White))
             .highlight_style(Style::default().bg(Color::Blue));
 
-        f.render_stateful_widget(list, f.size(), &mut self.state);
+        (list, &mut self.state)
     }
 
     fn state(&mut self) -> &mut ListState {
@@ -53,7 +51,7 @@ impl ScreenItem for FuncAsm {
         self.list.len()
     }
 
-    fn go_in(&self, _f: &mut Frame<Backend>, _state: &GlobalState) -> Option<ItemType> {
+    fn go_in(&self, _state: &GlobalState) -> Option<ItemType> {
         None
     }
 }
