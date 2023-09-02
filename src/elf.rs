@@ -101,7 +101,7 @@ impl Elf {
         }
     }
 
-    pub fn func_code_reloc(&self, name: &String) -> &[u8] {
+    fn func_code_reloc(&self, name: &String) -> &[u8] {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
         let (symtab, strtab) = self
@@ -113,8 +113,6 @@ impl Elf {
         for i in symtab {
             if i.st_symtype() == ELF_SYM_STT_FUNC {
                 if strtab.get(i.st_name as usize).unwrap() == name {
-
-                    crate::log_info!("Found {} at addr {}", name, i.st_value);
 
                     return &self
                         .data
@@ -128,7 +126,7 @@ impl Elf {
         todo!();
     }
 
-    pub fn func_code_exe(&self, name: &String) -> &[u8] {
+    fn func_code_exe(&self, name: &String) -> &[u8] {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
         let (symtab, strtab) = self
@@ -137,13 +135,14 @@ impl Elf {
             .expect("Failed to get symbol table")
             .unwrap();
 
-
         for i in symtab {
             if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
                 let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
 
                 let start = (i.st_value - target_section.sh_addr) as usize;
                 let end = start + i.st_size as usize;
+
+                crate::log_info!("Found {} at addr {}", name, i.st_value);
 
                 return &self
                     .data

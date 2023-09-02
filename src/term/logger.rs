@@ -26,8 +26,8 @@ impl Logger {
         }
     }
 
-    pub fn push(&mut self, msg: &str, t: LogType) {
-        self.log.push_back((msg.to_owned(), t));
+    pub fn push(&mut self, msg: String, t: LogType) {
+        self.log.push_back((msg, t));
     }
 
     pub fn flush(&mut self) -> Paragraph {
@@ -61,14 +61,14 @@ macro_rules! dump_logger {
 
 #[macro_export]
 macro_rules! log_info {
-    ($fmt:expr, $($arg:expr),*) => {
+    ($fmt:expr, $($args:tt)*) => {
         unsafe {
-            crate::term::logger::LOGGER.push(format!($fmt, $((&$arg)),*), crate::term::logger::LogType::Info);
+            crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), crate::term::logger::LogType::Info);
         }
     };
     ($fmt:expr) => {
         unsafe {
-            crate::term::logger::LOGGER.push($fmt, crate::term::logger::LogType::Info);
+            crate::term::logger::LOGGER.push(($fmt).to_string(), crate::term::logger::LogType::Info);
         }
     }
 }
@@ -77,7 +77,7 @@ macro_rules! log_info {
 macro_rules! log_debug {
     ($fmt:expr, $($arg:expr),*) => {
         unsafe {
-            crate::term::logger::LOGGER.push(format!($fmt, $(unsafe_render(&$arg)),*), crate::term::logger::LogType::Debug);
+            crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), crate::term::logger::LogType::Debug);
         }
     };
     ($fmt:expr) => {

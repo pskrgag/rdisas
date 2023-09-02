@@ -63,7 +63,6 @@ pub trait ScreenItem {
         let s = self.state();
         let selected = s.selected().unwrap();
 
-        log_info!("Hello world!\n");
         s.select(Some(prev_state(size, selected)));
     }
 }

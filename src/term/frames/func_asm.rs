@@ -13,7 +13,7 @@ pub struct FuncAsm {
 
 impl FuncAsm {
     pub fn new(function_name: &String, state: &GlobalState) -> Self {
-        let code = state.elf().func_code_exe(function_name);
+        let code = state.elf().func_code(function_name);
         let code = state.capstone().disasm_all(code, 0x0).unwrap();
 
         Self {

@@ -69,9 +69,7 @@ impl Term {
 
                 let block = Block::default().title(title).borders(Borders::ALL);
                 f.render_widget(block, chunks[0]);
-
-                let block = Block::default().title("Debug").borders(Borders::ALL);
-                f.render_widget(block, chunks[1]);
+                f.render_widget(crate::dump_logger!(), chunks[1]);
             })
             .unwrap();
     }
