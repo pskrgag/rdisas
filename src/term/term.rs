@@ -1,35 +1,26 @@
 use crate::disas::GlobalState;
 use crate::term::frames::func_list::*;
-use std::any::Any;
 use std::io;
 use tui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Widget},
-    Frame, Terminal,
+    widgets::{Block, Borders},
+    Terminal,
 };
 
+use crate::term::frames::*;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableBracketedPaste, EnableFocusChange, EnableMouseCapture,
-    },
+    event::EnableFocusChange,
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
 
 use std::collections::LinkedList;
 
 pub type Backend = CrosstermBackend<std::io::Stdout>;
 
-pub enum ItemType {
-    FunctionList,
-    FunctionDisas,
-}
-
 pub struct Term {
     t: Terminal<Backend>,
-    frame_list: LinkedList<Box<dyn ScreenItem>>, // Like a cache for now
+    frame_list: LinkedList<ItemType>, // Like a cache for now
 }
 
 // End of frames
@@ -65,10 +56,10 @@ impl Term {
     pub fn draw_func_list(&mut self, funcs: Vec<String>) {
         assert!(self.frame_list.is_empty());
 
-        let mut main = Box::new(FuncList::new(funcs));
+        let mut main = FuncList::new(funcs);
         self.t.draw(|f| main.draw(f)).unwrap();
 
-        self.frame_list.push_back(main);
+        self.frame_list.push_back(ItemType::FunctionList(main));
     }
 
     pub fn next_elem(&mut self) {
@@ -90,59 +81,34 @@ impl Term {
 
         self.frame_list.pop_front();
 
-        self.t.draw(|f| self.frame_list.front_mut().unwrap().draw(f));
+        self.t
+            .draw(|f| self.frame_list.front_mut().unwrap().draw(f))
+            .unwrap();
     }
 
-    pub fn go_in(&mut self, state: GlobalState) {
-        // We know it exist
-        let current = self.frame_list.front_mut().unwrap();
-        let s = current.state();
+    pub fn go_in(&mut self, state: &GlobalState) {
+        let mut new = None;
 
-        match current.whoami() {
-            ItemType::FunctionList => {
-                let mut c = current.as_any().downcast_mut::<FuncList>().unwrap();
-                let mut new = None;
+        {
+            // We know it exist
+            let current = self.frame_list.front_mut().unwrap();
 
-                self.t.draw(|f| {
-                    new = c.go_in(f, state);
-                });
-
-                if let Some(s) = new {
-                    self.frame_list.push_front(s);
+            match current {
+                ItemType::FunctionList(c) => {
+                    self.t
+                        .draw(|f| {
+                            new = c.go_in(f, state);
+                        })
+                        .unwrap();
                 }
+                ItemType::FunctionDisas(c) => {}
             }
-            ItemType::FunctionDisas => {},
-            _ => todo!(),
+        }
+
+        if let Some(s) = new {
+            self.frame_list.push_front(s);
         }
     }
-}
-
-pub trait ScreenItem {
-    fn whoami(&self) -> ItemType;
-    fn list_size(&self) -> usize;
-    fn state(&mut self) -> &mut ListState;
-    fn draw(&mut self, f: &mut Frame<Backend>);
-    fn as_any(&mut self) -> &mut dyn Any;
-
-    fn next(&mut self, f: &mut Frame<Backend>) {
-        let size = self.list_size();
-        let s = self.state();
-        let selected = s.selected().unwrap();
-
-        s.select(Some(next_state(size, selected)));
-        self.draw(f);
-    }
-
-    fn prev(&mut self, f: &mut Frame<Backend>) {
-        let size = self.list_size();
-        let s = self.state();
-        let selected = s.selected().unwrap();
-
-        s.select(Some(prev_state(size, selected)));
-        self.draw(f);
-    }
-
-    fn go_in(&mut self, f: &mut Frame<Backend>, s: GlobalState) -> Option<Box<dyn ScreenItem>>;
 }
 
 impl Drop for Term {
@@ -153,19 +119,5 @@ impl Drop for Term {
             self.t.clear();
             disable_raw_mode();
         }
-    }
-}
-
-// Helper functions
-
-fn next_state(size: usize, state: usize) -> usize {
-    (state + 1) % size
-}
-
-fn prev_state(size: usize, state: usize) -> usize {
-    if state == 0 {
-        size - 1
-    } else {
-        state - 1
     }
 }

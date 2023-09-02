@@ -1,6 +1,5 @@
 use crate::disas::GlobalState;
-use crate::elf_disas::CapstoneWrapper;
-use crate::term::term::{Backend, ItemType, ScreenItem};
+use crate::term::term::Backend;
 use std::any::Any;
 use tui::{
     layout::{Constraint, Direction, Layout},
@@ -8,7 +7,8 @@ use tui::{
     widgets::{Block, Borders, List, ListItem, ListState, Widget},
     Frame, Terminal,
 };
-use crate::term::frames::func_asm::FuncAsm;
+use super::func_asm::FuncAsm;
+use super::{ScreenItem, ItemType};
 
 pub struct FuncList {
     list: Vec<String>, // Should be smth better for prefix finding
@@ -17,21 +17,14 @@ pub struct FuncList {
 
 impl FuncList {
     pub fn new(l: Vec<String>) -> Self {
-        let mut s = Self {
+        Self {
             list: l,
-            state: ListState::default(),
-        };
-
-        s.state.select(Some(0));
-        s
+            state: ListState::default().with_selected(Some(0)),
+        }
     }
 }
 
 impl ScreenItem for FuncList {
-    fn whoami(&self) -> ItemType {
-        ItemType::FunctionList
-    }
-
     fn draw(&mut self, f: &mut Frame<Backend>) {
         let items: Vec<ListItem> = self.list.iter().map(|i| ListItem::new(&**i)).collect();
         let list = List::new(items)
@@ -54,15 +47,11 @@ impl ScreenItem for FuncList {
         self.list.len()
     }
 
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn go_in(&mut self, f: &mut Frame<Backend>, state: GlobalState) -> Option<Box<dyn ScreenItem>> {
+    fn go_in(&self, f: &mut Frame<Backend>, state: &GlobalState) -> Option<ItemType> {
         let s = self.state.selected().unwrap();
-        let mut new = Box::new(FuncAsm::new(&self.list[s], state));
+        let mut new = FuncAsm::new(&self.list[s], &state);
 
         new.draw(f);
-        Some(new)
+        Some(ItemType::FunctionDisas(new))
     }
 }

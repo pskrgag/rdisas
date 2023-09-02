@@ -1,16 +1,16 @@
-#![feature(slice_pattern)]
-
 use memmap::MmapOptions;
 use std::env;
 
 mod disas;
 mod elf;
-mod elf_disas;
 mod term;
 
 #[macro_use]
 extern crate log;
 extern crate capstone;
+
+#[macro_use]
+extern crate lazy_static;
 
 fn main() {
     env_logger::init();
@@ -40,7 +40,7 @@ fn main() {
     }
     .unwrap();
 
-    let e = match elf::Elf::new(&*mmap_data) {
+    let e = match elf::Elf::new(Box::leak(Box::new(mmap_data))) {
         Some(e) => Some(e),
         None => {
             error!("Failed to create elf");
@@ -49,7 +49,7 @@ fn main() {
     }
     .unwrap();
 
-    let mut d = disas::Disas::new(args[1].clone(), e).unwrap();
+    let d = disas::Disas::new(args[1].clone(), e).unwrap();
 
     d.exec();
 }

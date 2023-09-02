@@ -10,22 +10,26 @@ pub struct Functions<'a> {
 
 impl<'a> Functions<'a> {
     pub fn new(list: Vec<(&'a str, Symbol)>) -> Self {
-        Self { list: list }
+        Self { list }
     }
 
-    // refs didn't work.... I am too dumbat rust
+    // refs didn't work.... I am too dumb at rust
     pub fn names(&self) -> Vec<String> {
         self.list.iter().map(|x| x.0.to_owned()).collect()
     }
 }
 
-pub struct Elf<'a> {
-    data: ElfBytes<'a, AnyEndian>,
-    sections: Option<SectionHeaderTable<'a, AnyEndian>>,
+pub struct Elf {
+    data: ElfBytes<'static, AnyEndian>,
+    sections: Option<SectionHeaderTable<'static, AnyEndian>>,
 }
 
-impl<'a> Elf<'a> {
-    pub fn new(data: &'a [u8]) -> Option<Self> {
+pub enum ElfArch {
+    X86,
+}
+
+impl Elf {
+    pub fn new(data: &'static [u8]) -> Option<Self> {
         let data = match ElfBytes::<AnyEndian>::minimal_parse(data) {
             Ok(o) => Some(o),
             Err(e) => {
@@ -37,9 +41,13 @@ impl<'a> Elf<'a> {
         Self::check_header(&data)?;
 
         Some(Self {
-            data: data,
+            data,
             sections: None,
         })
+    }
+
+    pub fn arch(&self) -> ElfArch {
+        ElfArch::X86
     }
 
     pub fn load_sections(&mut self) -> Option<()> {
@@ -129,7 +137,6 @@ impl<'a> Elf<'a> {
 
         for i in symtab {
             if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
-                let data = Some((i.st_value, i.st_shndx));
                 let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
 
                 let start = (i.st_value - target_section.sh_addr) as usize;
