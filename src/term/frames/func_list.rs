@@ -30,7 +30,7 @@ impl ScreenItem for FuncList {
                     .borders(Borders::ALL),
             )
             .style(Style::default().fg(Color::White))
-            .highlight_style(Style::default().bg(Color::Blue));
+            .highlight_style(Style::default().bg(Color::Cyan));
 
         (list, &mut self.state)
     }
@@ -45,7 +45,7 @@ impl ScreenItem for FuncList {
 
     fn go_in(&self, state: &GlobalState) -> Option<ItemType> {
         let s = self.state.selected().unwrap();
-        let new = FuncAsm::new(&self.list[s], &state);
+        let new = FuncAsm::new(self.list[s].clone(), &state);
 
         Some(ItemType::FunctionDisas(new))
     }

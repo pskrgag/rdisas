@@ -9,14 +9,16 @@ use tui::{
 pub struct FuncAsm {
     list: Instructions<'static>, // Should be smth better for prefix finding
     state: ListState,
+    name: String,
 }
 
 impl FuncAsm {
-    pub fn new(function_name: &String, state: &GlobalState) -> Self {
-        let code = state.elf().func_code(function_name);
-        let code = state.capstone().disasm_all(code, 0x0).unwrap();
+    pub fn new(function_name: String, state: &GlobalState) -> Self {
+        let (code, addr) = state.elf().func_code(&function_name);
+        let code = state.capstone().disasm_all(code, addr).unwrap();
 
         Self {
+            name: function_name,
             list: code,
             state: ListState::default().with_selected(Some(0)),
         }
@@ -34,11 +36,11 @@ impl ScreenItem for FuncAsm {
         let list = List::new(items)
             .block(
                 Block::default()
-                    .title("Function list")
+                    .title(format!("Disassembly of {}", self.name))
                     .borders(Borders::ALL),
             )
             .style(Style::default().fg(Color::White))
-            .highlight_style(Style::default().bg(Color::Blue));
+            .highlight_style(Style::default().bg(Color::Cyan));
 
         (list, &mut self.state)
     }

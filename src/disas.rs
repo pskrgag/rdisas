@@ -55,8 +55,7 @@ impl Disas {
     pub fn exec(self) {
         info!("Starting main loop");
 
-        self.t
-            .borrow_mut().setup(format!("Disassembly for {}", self.file).as_str());
+        self.t.borrow_mut().setup();
 
         let f = self
             .global_state

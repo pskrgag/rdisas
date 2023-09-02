@@ -93,7 +93,7 @@ impl Elf {
         }
     }
 
-    pub fn func_code(&self, name: &String) -> &[u8] {
+    pub fn func_code(&self, name: &String) -> (&[u8], u64) {
         match self.data.ehdr.e_type {
             elf::abi::ET_REL => self.func_code_reloc(name),
             elf::abi::ET_DYN | elf::abi::ET_EXEC => self.func_code_exe(name),
@@ -101,7 +101,7 @@ impl Elf {
         }
     }
 
-    fn func_code_reloc(&self, name: &String) -> &[u8] {
+    fn func_code_reloc(&self, name: &String) -> (&[u8], u64) {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
         let (symtab, strtab) = self
@@ -114,11 +114,11 @@ impl Elf {
             if i.st_symtype() == ELF_SYM_STT_FUNC {
                 if strtab.get(i.st_name as usize).unwrap() == name {
 
-                    return &self
+                    return (&self
                         .data
                         .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
                         .unwrap()
-                        .0[i.st_value as usize..i.st_size as usize];
+                        .0[i.st_value as usize..i.st_size as usize], i.st_value);
                 }
             }
         }
@@ -126,7 +126,7 @@ impl Elf {
         todo!();
     }
 
-    fn func_code_exe(&self, name: &String) -> &[u8] {
+    fn func_code_exe(&self, name: &String) -> (&[u8], u64) {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
         let (symtab, strtab) = self
@@ -144,10 +144,10 @@ impl Elf {
 
                 crate::log_info!("Found {} at addr {}", name, i.st_value);
 
-                return &self
+                return (&self
                     .data
                     .section_data(target_section).unwrap()
-                    .0[start..end];
+                    .0[start..end], i.st_value);
             }
         }
 

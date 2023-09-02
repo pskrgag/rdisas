@@ -4,7 +4,7 @@ use std::io;
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
     Frame, Terminal,
 };
 
@@ -31,7 +31,7 @@ impl Term {
         Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
+            .constraints([Constraint::Percentage(80), Constraint::Percentage(15), Constraint::Percentage(5)].as_ref())
     }
 
     fn draw_list(layout: Layout, fr: &mut impl ScreenItem, f: &mut Frame<Backend>) {
@@ -60,18 +60,8 @@ impl Term {
         })
     }
 
-    pub fn setup(&mut self, title: &str) {
+    pub fn setup(&mut self) {
         self.t.clear().unwrap();
-
-        self.t
-            .draw(|f| {
-                let chunks = self.layout.split(f.size());
-
-                let block = Block::default().title(title).borders(Borders::ALL);
-                f.render_widget(block, chunks[0]);
-                f.render_widget(crate::dump_logger!(), chunks[1]);
-            })
-            .unwrap();
     }
 
     pub fn draw_func_list(&mut self, funcs: Vec<String>) {
