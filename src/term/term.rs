@@ -1,28 +1,22 @@
+use super::cmd::CommandLine;
+use crate::disas::Backend;
 use crate::disas::GlobalState;
 use crate::term::frames::func_list::*;
-use std::io;
 use tui::{
-    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders},
+    style::{Color, Style},
     Frame, Terminal,
 };
 
 use crate::term::frames::*;
-use crossterm::{
-    event::EnableFocusChange,
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
 
 use std::collections::LinkedList;
 
-pub type Backend = CrosstermBackend<std::io::Stdout>;
-
 pub struct Term {
-    t: Terminal<Backend>,
     layout: Layout,
     frame_list: LinkedList<ItemType>, // Like a cache for now
+    cmd: CommandLine,
+    cmd_active: bool,
 }
 
 // End of frames
@@ -31,120 +25,125 @@ impl Term {
         Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Percentage(80), Constraint::Percentage(15), Constraint::Percentage(5)].as_ref())
+            .constraints(
+                [
+                    Constraint::Percentage(80),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(5),
+                ]
+                .as_ref(),
+            )
     }
 
-    fn draw_list(layout: Layout, fr: &mut impl ScreenItem, f: &mut Frame<Backend>) {
+    fn draw_list(&mut self, f: &mut Frame<Backend>) {
+        let fr = self.frame_list.front_mut().unwrap();
         let (list, state) = fr.draw();
-        let chunks = layout.split(f.size());
+        let chunks = self.layout.split(f.size());
 
         f.render_stateful_widget(list, chunks[0], state);
 
         let debug = crate::dump_logger!();
         f.render_widget(debug, chunks[1]);
+
+        let cmd = self.cmd.dump();
+
+        if self.cmd_active {
+            f.render_widget(cmd.style(Style::default().fg(Color::Blue)), chunks[2]);
+        } else {
+            f.render_widget(cmd, chunks[2]);
+        }
     }
 
     pub fn new() -> Option<Self> {
-        let stdout = io::stdout();
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend).ok()?;
-
-        enable_raw_mode().ok()?;
-
-        execute!(terminal.backend_mut(), EnableFocusChange,).ok()?;
-
         Some(Self {
             layout: Self::ui_layout(),
-            t: terminal,
             frame_list: LinkedList::new(),
+            cmd: CommandLine::new(),
+            cmd_active: false,
         })
     }
 
-    pub fn setup(&mut self) {
-        self.t.clear().unwrap();
-    }
-
-    pub fn draw_func_list(&mut self, funcs: Vec<String>) {
+    pub fn draw_func_list(&mut self, t: &mut Terminal<Backend>, funcs: Vec<String>) {
         assert!(self.frame_list.is_empty());
 
-        let mut main = FuncList::new(funcs);
-
-        self.t.draw(|f| Self::draw_list(self.layout.clone(), &mut main, f)).unwrap();
+        let main = FuncList::new(funcs);
 
         self.frame_list.push_back(ItemType::FunctionList(main));
+        t.draw(|f| self.draw_list(f)).unwrap();
     }
 
-    pub fn next_elem(&mut self) {
-        let fr = self.frame_list.front_mut().unwrap();
-
-        self.t
-            .draw(|f| {
+    pub fn next_elem(&mut self, t: &mut Terminal<Backend>) {
+        t.draw(|f| {
+            {
+                let fr = self.frame_list.front_mut().unwrap();
                 fr.next();
-                Self::draw_list(self.layout.clone(), fr, f)
-            })
-            .unwrap();
+            }
+            self.draw_list(f);
+        })
+        .unwrap();
     }
 
-    pub fn prev_elem(&mut self) {
-        let fr = self.frame_list.front_mut().unwrap();
-
-        self.t
-            .draw(|f| {
+    pub fn prev_elem(&mut self, t: &mut Terminal<Backend>) {
+        t.draw(|f| {
+            {
+                let fr = self.frame_list.front_mut().unwrap();
                 fr.prev();
-                Self::draw_list(self.layout.clone(), fr, f)
-            })
-            .unwrap();
+            }
+            self.draw_list(f)
+        })
+        .unwrap();
     }
 
-    pub fn prev_frame(&mut self) {
+    pub fn prev_frame(&mut self, t: &mut Terminal<Backend>) {
         if self.frame_list.len() == 1 {
             return;
         }
 
         self.frame_list.pop_front();
 
-        self.t
-            .draw(|f| {
-                let new = self.frame_list.front_mut().unwrap();
-                Self::draw_list(self.layout.clone(), new, f)
-            })
-            .unwrap();
+        t.draw(|f| self.draw_list(f)).unwrap();
     }
 
-    pub fn go_in(&mut self, state: &GlobalState) {
-        let mut new = None;
-        {
-            // We know it exist
-            let current = self.frame_list.front_mut().unwrap();
+    pub fn go_in(&mut self, t: &mut Terminal<Backend>, state: &GlobalState) {
+        // We know it exist
+        let current = self.frame_list.front_mut().unwrap();
 
-            match current {
-                ItemType::FunctionList(c) => {
-                    self.t
-                        .draw(|f| {
-                            new = c.go_in(state);
-                            if let Some(ref mut s) = new {
-                                Self::draw_list(self.layout.clone(), s, f);
-                            }
-                        })
-                        .unwrap();
+        match current {
+            ItemType::FunctionList(c) => {
+                let new = c.go_in(state);
+                if let Some(s) = new {
+                    self.frame_list.push_front(s);
                 }
-                ItemType::FunctionDisas(c) => {}
             }
+            ItemType::FunctionDisas(_c) => {}
         }
 
-        if let Some(s) = new {
-            self.frame_list.push_front(s);
-        }
+        self.cmd_active = false;
+        t.draw(|f| self.draw_list(f)).unwrap();
     }
-}
 
-impl Drop for Term {
-    fn drop(&mut self) {
-        // Restore terminal in normal state
-        #[allow(unused_must_use)]
-        {
-            self.t.clear();
-            disable_raw_mode();
-        }
+    pub fn activate_cmd(&mut self, t: &mut Terminal<Backend>) {
+        self.cmd_active = true;
+        self.cmd.clear();
+        t.draw(|f| self.draw_list(f)).unwrap();
+    }
+
+    pub fn reset_cmd(&mut self, t: &mut Terminal<Backend>) {
+        self.cmd_active = false;
+        t.draw(|f| self.draw_list(f)).unwrap();
+    }
+
+    pub fn input_char(&mut self, t: &mut Terminal<Backend>, c: Option<char>) {
+        assert!(self.cmd_active);
+
+        self.cmd.proccess_char(c);
+
+        crate::log_info!("THere....");
+        self.frame_list.front_mut().unwrap().find(self.cmd.dump_raw());
+
+        t.draw(|f| {
+            self.draw_list(f);
+        })
+        .unwrap();
     }
 }

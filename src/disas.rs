@@ -3,9 +3,18 @@ use crate::term::{
     events::{wait_event, KeyboardEvent},
     term::Term,
 };
+use tui::{
+    backend::CrosstermBackend,
+    Terminal,
+};
 use capstone::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use crossterm::{
+    event::EnableFocusChange,
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 
 pub enum State {
     Control,
@@ -19,7 +28,6 @@ pub struct GlobalState {
 
 // management structure
 pub struct Disas {
-    file: String,
     t: Rc<RefCell<Term>>,
     state: State,
     global_state: GlobalState,
@@ -35,14 +43,15 @@ impl GlobalState {
     }
 }
 
+pub type Backend = CrosstermBackend<std::io::Stdout>;
+
 impl Disas {
     pub fn new(file: String, mut e: Elf) -> Option<Self> {
-        info!("Disas created from {} file", file);
+        crate::log_info!("Disas created from {} file", file);
 
         e.load_sections();
 
         Some(Self {
-            file,
             global_state: GlobalState {
                 elf: e,
                 cs: Box::leak(Box::new(Capstone::new().x86().mode(arch::x86::ArchMode::Mode64).build().ok()?)),
@@ -52,10 +61,8 @@ impl Disas {
         })
     }
 
-    pub fn exec(self) {
+    pub fn exec(mut self) {
         info!("Starting main loop");
-
-        self.t.borrow_mut().setup();
 
         let f = self
             .global_state
@@ -63,21 +70,48 @@ impl Disas {
             .function_names()
             .expect("Failed to get funtion names");
 
-        self.t.borrow_mut().draw_func_list(f.names());
 
+        let stdout = std::io::stdout();
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        enable_raw_mode().ok().unwrap();
+        execute!(terminal.backend_mut(), EnableFocusChange,).unwrap();
+
+        terminal.clear().unwrap();
+
+        self.t.borrow_mut().draw_func_list(&mut terminal, f.names());
         loop {
             let e = wait_event(&self.state);
+
+            if e == KeyboardEvent::CmdEnter {
+                self.t.borrow_mut().activate_cmd(&mut terminal);
+                self.state = State::Insert;
+                continue;
+            } else if e == KeyboardEvent::CmdEnd {
+                self.t.borrow_mut().reset_cmd(&mut terminal);
+                self.state = State::Control;
+                continue;
+            }
 
             let t = self.t.clone();
 
             match e {
-                KeyboardEvent::Next => t.borrow_mut().next_elem(),
-                KeyboardEvent::Prev => t.borrow_mut().prev_elem(),
-                KeyboardEvent::Enter => t.borrow_mut().go_in(&self.global_state),
-                KeyboardEvent::PrevFrame => t.borrow_mut().prev_frame(),
+                KeyboardEvent::Next => t.borrow_mut().next_elem(&mut terminal),
+                KeyboardEvent::Prev => t.borrow_mut().prev_elem(&mut terminal),
+                KeyboardEvent::Enter => {
+                    self.state = State::Control;
+                    t.borrow_mut().go_in(&mut terminal, &self.global_state);
+                }
+                KeyboardEvent::PrevFrame => t.borrow_mut().prev_frame(&mut terminal),
                 KeyboardEvent::Exit => break,
+                KeyboardEvent::Key(c) => t.borrow_mut().input_char(&mut terminal, Some(c)),
+                KeyboardEvent::Delete => t.borrow_mut().input_char(&mut terminal, None),
                 _ => {}
             }
         }
+
+        disable_raw_mode().unwrap();
+        terminal.clear().unwrap();
     }
 }

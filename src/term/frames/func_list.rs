@@ -1,20 +1,29 @@
+use super::func_asm::FuncAsm;
+use super::{ItemType, ScreenItem};
 use crate::disas::GlobalState;
 use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
 };
-use super::func_asm::FuncAsm;
-use super::{ScreenItem, ItemType};
 
 pub struct FuncList {
-    list: Vec<String>, // Should be smth better for prefix finding
+    list: Vec<(usize, String)>, // Should be smth better for prefix finding
     state: ListState,
 }
 
 impl FuncList {
     pub fn new(l: Vec<String>) -> Self {
+        let mut cnt = 0;
+
         Self {
-            list: l,
+            list: l
+                .into_iter()
+                .map(|x| {
+                    let new = (cnt, x);
+                    cnt += 1;
+                    new
+                })
+                .collect(),
             state: ListState::default().with_selected(Some(0)),
         }
     }
@@ -22,7 +31,11 @@ impl FuncList {
 
 impl ScreenItem for FuncList {
     fn draw(&mut self) -> (List, &mut ListState) {
-        let items: Vec<ListItem> = self.list.iter().map(|i| ListItem::new(&**i)).collect();
+        let items: Vec<ListItem> = self
+            .list
+            .iter()
+            .map(|i| ListItem::new(i.1.as_str()))
+            .collect();
         let list = List::new(items)
             .block(
                 Block::default()
@@ -45,8 +58,26 @@ impl ScreenItem for FuncList {
 
     fn go_in(&self, state: &GlobalState) -> Option<ItemType> {
         let s = self.state.selected().unwrap();
-        let new = FuncAsm::new(self.list[s].clone(), &state);
+        let new = FuncAsm::new(self.list[s].1.clone(), &state);
 
         Some(ItemType::FunctionDisas(new))
+    }
+
+    fn find(&mut self, s: &str) {
+        // use fuzzy_match::fuzzy_match;
+
+        log_info!("Tryng to find {}", s);
+
+        for i in self.state.selected().unwrap()..self.list.len() {
+            if self.list[i].1.contains(s) {
+                self.state.select(Some(i));
+                break;
+            }
+        }
+
+        // let res = fuzzy_match(s, self.list.iter()
+        //                                      .map(|x| (x.1.as_str(), x.0))
+        //                                      .collect::<Vec<(&str, usize)>>()
+        //                                      );
     }
 }

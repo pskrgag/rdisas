@@ -1,6 +1,6 @@
 use super::{ItemType, ScreenItem};
 use crate::disas::GlobalState;
-use capstone::Instructions;
+use capstone::{Instructions, Inst};
 use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
@@ -23,6 +23,10 @@ impl FuncAsm {
             state: ListState::default().with_selected(Some(0)),
         }
     }
+
+    // fn inst_to_string(i: &Inst) {
+    //     let detail
+    // }
 }
 
 impl ScreenItem for FuncAsm {

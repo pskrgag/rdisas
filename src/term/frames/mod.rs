@@ -42,6 +42,13 @@ impl ScreenItem for ItemType {
             Self::FunctionDisas(s) => s.draw(),
         }
     }
+
+    fn find(&mut self, st: &str) {
+        match self {
+            Self::FunctionList(s) => s.find(st),
+            Self::FunctionDisas(s) => s.find(st),
+        }
+    }
 }
 
 pub trait ScreenItem {
@@ -49,6 +56,10 @@ pub trait ScreenItem {
     fn state(&mut self) -> &mut ListState;
     fn draw(&mut self) -> (List, &mut ListState);
     fn go_in(&self, s: &GlobalState) -> Option<ItemType>;
+
+    fn find(&mut self, _s: &str) {
+        crate::log_warn!("Unimplemented!");
+    }
 
     fn next(&mut self) {
         let size = self.list_size();

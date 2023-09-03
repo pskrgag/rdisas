@@ -121,9 +121,11 @@ dependencies = [
  "crossterm 0.25.0",
  "elf",
  "env_logger",
+ "fuzzy_match",
  "log",
  "memmap",
  "ratatui",
+ "rust-fuzzy-search",
 ]
 
 [[package]]
@@ -143,6 +145,16 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "fuzzy_match"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f018ca9f4ec5fd881ecc3ec3970cbb2f68ce539aeef7ccdf528d2669a1c16e8"
+dependencies = [
+ "rustc_version",
+ "sliding_windows",
 ]
 
 [[package]]
@@ -286,10 +298,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "456c603be3e8d448b072f410900c09faf164fbce2d480456f50eea6e25f9c848"
 
 [[package]]
+name = "rust-fuzzy-search"
+version = "0.1.1"
+source = "git+https://gitlab.com/EnricoCh/rust-fuzzy-search#ee61779b91ba976bb8da861ff2f1a825f1be1464"
+
+[[package]]
+name = "rustc_version"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
+name = "semver"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4f410fedcf71af0345d7607d246e7ad15faaadd49d240ee3b24e5dc21a820ac"
 
 [[package]]
 name = "serde"
@@ -326,6 +358,12 @@ checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "sliding_windows"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a830e5d74dce35884bac85ecdc68c1ae96b9451918cc484f39340049c7a55f5e"
 
 [[package]]
 name = "smallvec"

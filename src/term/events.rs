@@ -1,13 +1,17 @@
 use crate::disas::State;
 use crossterm::event::{read, Event, KeyCode, KeyEvent};
 
+#[derive(PartialEq, Eq)]
 pub enum KeyboardEvent {
     Key(char),
     Enter,
     Next,
     Prev,
     Exit,
-    PrevFrame
+    PrevFrame,
+    CmdEnter,
+    CmdEnd,
+    Delete,
 }
 
 fn __wait_event() -> Option<KeyEvent> {
@@ -29,6 +33,8 @@ pub fn wait_event(s: &State) -> KeyboardEvent {
             State::Insert => match key.code {
                 KeyCode::Char(c) => Some(KeyboardEvent::Key(c)),
                 KeyCode::Enter => Some(KeyboardEvent::Enter),
+                KeyCode::Esc => Some(KeyboardEvent::CmdEnd),
+                KeyCode::Backspace => Some(KeyboardEvent::Delete),
                 _ => None,
             },
             State::Control => match key.code {
@@ -40,6 +46,7 @@ pub fn wait_event(s: &State) -> KeyboardEvent {
                 KeyCode::Char('j') => Some(KeyboardEvent::Next),
                 KeyCode::Char('h') => Some(KeyboardEvent::PrevFrame),
                 KeyCode::Char('l') => Some(KeyboardEvent::Enter), /* vim-like shit */
+                KeyCode::Char('/') => Some(KeyboardEvent::CmdEnter), /* vim-like shit */
                 _ => None,
             },
         };
