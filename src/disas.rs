@@ -3,18 +3,15 @@ use crate::term::{
     events::{wait_event, KeyboardEvent},
     term::Term,
 };
-use tui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
 use capstone::prelude::*;
-use std::cell::RefCell;
-use std::rc::Rc;
 use crossterm::{
     event::EnableFocusChange,
     execute,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use std::cell::RefCell;
+use std::rc::Rc;
+use tui::{backend::CrosstermBackend, Terminal};
 
 pub enum State {
     Control,
@@ -54,7 +51,14 @@ impl Disas {
         Some(Self {
             global_state: GlobalState {
                 elf: e,
-                cs: Box::leak(Box::new(Capstone::new().x86().mode(arch::x86::ArchMode::Mode64).build().ok()?)),
+                cs: Box::leak(Box::new(
+                    Capstone::new()
+                        .x86()
+                        .mode(arch::x86::ArchMode::Mode64)
+                        .detail(true)
+                        .build()
+                        .ok()?,
+                )),
             },
             t: Rc::new(RefCell::new(Term::new()?)),
             state: State::Control,
@@ -70,7 +74,6 @@ impl Disas {
             .function_names()
             .expect("Failed to get funtion names");
 
-
         let stdout = std::io::stdout();
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -80,7 +83,8 @@ impl Disas {
 
         terminal.clear().unwrap();
 
-        self.t.borrow_mut().draw_func_list(&mut terminal, f.names());
+        self.t.borrow_mut().draw_initial_frame(&mut terminal, f.names());
+
         loop {
             let e = wait_event(&self.state);
 

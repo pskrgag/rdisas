@@ -1,15 +1,22 @@
 use super::{ItemType, ScreenItem};
 use crate::disas::GlobalState;
-use capstone::{Instructions, Inst};
+use capstone::Capstone;
+use capstone::InsnGroupId;
+use capstone::InsnGroupType;
+use capstone::{Insn, Instructions};
 use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
+const CALL_INST: u8 = InsnGroupType::CS_GRP_CALL as u8;
+const JUMP_INST: u8 = InsnGroupType::CS_GRP_JUMP as u8;
+
 pub struct FuncAsm {
-    list: Instructions<'static>, // Should be smth better for prefix finding
+    list: Instructions<'static>,
     state: ListState,
     name: String,
+    cs: &'static Capstone,
 }
 
 impl FuncAsm {
@@ -18,15 +25,35 @@ impl FuncAsm {
         let code = state.capstone().disasm_all(code, addr).unwrap();
 
         Self {
+            cs: state.capstone(),
             name: function_name,
             list: code,
             state: ListState::default().with_selected(Some(0)),
         }
     }
 
-    // fn inst_to_string(i: &Inst) {
-    //     let detail
-    // }
+    fn inst_to_string(&self, inst: &Insn) -> String {
+        let detail = self.cs.insn_detail(inst);
+
+        if let Ok(d) = detail {
+            let group = d.groups();
+
+            for i in group {
+                match i {
+                    InsnGroupId(CALL_INST) => {
+                        log_info!("Found call inst at addr {}", inst.address());
+                    }
+                    InsnGroupId(JUMP_INST) => {
+                        log_info!("Found jump inst at addr {}", inst.address());
+                    }
+                    _ => {}
+                }
+            }
+            inst.to_string()
+        } else {
+            inst.to_string()
+        }
+    }
 }
 
 impl ScreenItem for FuncAsm {
@@ -34,7 +61,7 @@ impl ScreenItem for FuncAsm {
         let items: Vec<ListItem> = self
             .list
             .iter()
-            .map(|i| ListItem::new(i.to_string()))
+            .map(|i| ListItem::new(self.inst_to_string(i)))
             .collect();
 
         let list = List::new(items)

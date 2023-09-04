@@ -1,8 +1,13 @@
 use elf::endian::AnyEndian;
 use elf::file::*;
-use elf::section::{SectionHeaderTable, SectionHeader};
+use elf::section::{SectionHeader, SectionHeaderTable};
 use elf::symbol::Symbol;
 use elf::ElfBytes;
+use std::collections::HashMap;
+
+// Name and section index
+type Function = (String, u64);
+type FunctionMap = HashMap<u64, Function>;
 
 pub struct Functions<'a> {
     list: Vec<(&'a str, Symbol)>,
@@ -22,10 +27,7 @@ impl<'a> Functions<'a> {
 pub struct Elf {
     data: ElfBytes<'static, AnyEndian>,
     sections: Option<SectionHeaderTable<'static, AnyEndian>>,
-}
-
-pub enum ElfArch {
-    X86,
+    functions: FunctionMap,
 }
 
 impl Elf {
@@ -41,13 +43,10 @@ impl Elf {
         Self::check_header(&data)?;
 
         Some(Self {
+            functions: HashMap::new(),
             data,
             sections: None,
         })
-    }
-
-    pub fn arch(&self) -> ElfArch {
-        ElfArch::X86
     }
 
     pub fn load_sections(&mut self) -> Option<()> {
@@ -77,10 +76,32 @@ impl Elf {
         Some(())
     }
 
-    pub fn function_names(&self) -> Option<Functions> {
+    pub fn function_name_by_addr(&self, addr: u64) -> Option<String> {
+        Some(self.functions.get(&addr)?.0.clone())
+    }
+
+    pub fn function_names(&mut self) -> Option<Functions> {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
+        // TODO: optimize that shit!!!!!
         if let Ok(Some((symtab, strtab))) = self.data.symbol_table() {
+            self.functions = symtab
+                .iter()
+                .filter(|s| s.st_symtype() == ELF_SYM_STT_FUNC)
+                .map(|sym| {
+                    (
+                        sym.st_value,
+                        (
+                            strtab
+                                .get(sym.st_name as usize)
+                                .unwrap_or("unknown")
+                                .to_owned(),
+                            sym.st_shndx as u64,
+                        )
+                    )
+                })
+                .collect();
+
             Some(Functions::new(
                 symtab
                     .iter()
@@ -113,12 +134,14 @@ impl Elf {
         for i in symtab {
             if i.st_symtype() == ELF_SYM_STT_FUNC {
                 if strtab.get(i.st_name as usize).unwrap() == name {
-
-                    return (&self
-                        .data
-                        .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
-                        .unwrap()
-                        .0[i.st_value as usize..i.st_size as usize], i.st_value);
+                    return (
+                        &self
+                            .data
+                            .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
+                            .unwrap()
+                            .0[i.st_value as usize..i.st_size as usize],
+                        i.st_value,
+                    );
                 }
             }
         }
@@ -136,7 +159,8 @@ impl Elf {
             .unwrap();
 
         for i in symtab {
-            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
+            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name
+            {
                 let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
 
                 let start = (i.st_value - target_section.sh_addr) as usize;
@@ -144,19 +168,27 @@ impl Elf {
 
                 crate::log_info!("Found {} at addr {}", name, i.st_value);
 
-                return (&self
-                    .data
-                    .section_data(target_section).unwrap()
-                    .0[start..end], i.st_value);
+                return (
+                    &self.data.section_data(target_section).unwrap().0[start..end],
+                    i.st_value,
+                );
             }
         }
 
         todo!()
     }
 
+    #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn section_name(&self, s: &SectionHeader) {
-        let sh = self.data.section_header_by_name(".shstrtab").unwrap().unwrap();
-        println!("section {:?}", std::str::from_utf8(&self.data.section_data(&sh).unwrap().0[s.sh_name as usize..]));
+        let sh = self
+            .data
+            .section_header_by_name(".shstrtab")
+            .unwrap()
+            .unwrap();
+        println!(
+            "section {:?}",
+            std::str::from_utf8(&self.data.section_data(&sh).unwrap().0[s.sh_name as usize..])
+        );
     }
-
 }

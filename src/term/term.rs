@@ -35,7 +35,7 @@ impl Term {
             )
     }
 
-    fn draw_list(&mut self, f: &mut Frame<Backend>) {
+    fn draw_ui(&mut self, f: &mut Frame<Backend>) {
         let fr = self.frame_list.front_mut().unwrap();
         let (list, state) = fr.draw();
         let chunks = self.layout.split(f.size());
@@ -63,13 +63,13 @@ impl Term {
         })
     }
 
-    pub fn draw_func_list(&mut self, t: &mut Terminal<Backend>, funcs: Vec<String>) {
+    pub fn draw_initial_frame(&mut self, t: &mut Terminal<Backend>, funcs: Vec<String>) {
         assert!(self.frame_list.is_empty());
 
         let main = FuncList::new(funcs);
 
         self.frame_list.push_back(ItemType::FunctionList(main));
-        t.draw(|f| self.draw_list(f)).unwrap();
+        t.draw(|f| self.draw_ui(f)).unwrap();
     }
 
     pub fn next_elem(&mut self, t: &mut Terminal<Backend>) {
@@ -78,7 +78,7 @@ impl Term {
                 let fr = self.frame_list.front_mut().unwrap();
                 fr.next();
             }
-            self.draw_list(f);
+            self.draw_ui(f);
         })
         .unwrap();
     }
@@ -89,7 +89,7 @@ impl Term {
                 let fr = self.frame_list.front_mut().unwrap();
                 fr.prev();
             }
-            self.draw_list(f)
+            self.draw_ui(f)
         })
         .unwrap();
     }
@@ -101,7 +101,7 @@ impl Term {
 
         self.frame_list.pop_front();
 
-        t.draw(|f| self.draw_list(f)).unwrap();
+        t.draw(|f| self.draw_ui(f)).unwrap();
     }
 
     pub fn go_in(&mut self, t: &mut Terminal<Backend>, state: &GlobalState) {
@@ -119,18 +119,18 @@ impl Term {
         }
 
         self.cmd_active = false;
-        t.draw(|f| self.draw_list(f)).unwrap();
+        t.draw(|f| self.draw_ui(f)).unwrap();
     }
 
     pub fn activate_cmd(&mut self, t: &mut Terminal<Backend>) {
         self.cmd_active = true;
         self.cmd.clear();
-        t.draw(|f| self.draw_list(f)).unwrap();
+        t.draw(|f| self.draw_ui(f)).unwrap();
     }
 
     pub fn reset_cmd(&mut self, t: &mut Terminal<Backend>) {
         self.cmd_active = false;
-        t.draw(|f| self.draw_list(f)).unwrap();
+        t.draw(|f| self.draw_ui(f)).unwrap();
     }
 
     pub fn input_char(&mut self, t: &mut Terminal<Backend>, c: Option<char>) {
@@ -138,11 +138,10 @@ impl Term {
 
         self.cmd.proccess_char(c);
 
-        crate::log_info!("THere....");
         self.frame_list.front_mut().unwrap().find(self.cmd.dump_raw());
 
         t.draw(|f| {
-            self.draw_list(f);
+            self.draw_ui(f);
         })
         .unwrap();
     }
