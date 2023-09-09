@@ -19,7 +19,7 @@ pub enum State {
 }
 
 pub struct GlobalState {
-    pub(crate) elf: Elf,
+    pub(crate) elf: &'static Elf,
     pub(crate) cs: &'static Capstone,
 }
 
@@ -31,8 +31,8 @@ pub struct Disas {
 }
 
 impl GlobalState {
-    pub fn elf(&self) -> &Elf {
-        &self.elf
+    pub fn elf(&self) -> &'static Elf {
+        self.elf
     }
 
     pub fn capstone(&self) -> &'static Capstone {
@@ -50,7 +50,7 @@ impl Disas {
 
         Some(Self {
             global_state: GlobalState {
-                elf: e,
+                elf: Box::leak(Box::new(e)),
                 cs: Box::leak(Box::new(
                     Capstone::new()
                         .x86()

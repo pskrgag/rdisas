@@ -15,7 +15,7 @@ pub enum ItemType {
 }
 
 impl ScreenItem for ItemType {
-    fn go_in(&self, s: &GlobalState) -> Option<ItemType> {
+    fn go_in(&mut self, s: &GlobalState) -> Option<ItemType> {
         match self {
             Self::FunctionList(e) => e.go_in(s),
             Self::FunctionDisas(e) => e.go_in(s),
@@ -49,13 +49,27 @@ impl ScreenItem for ItemType {
             Self::FunctionDisas(s) => s.find(st),
         }
     }
+
+    fn next(&mut self) {
+        match self {
+            Self::FunctionList(s) => s.next(),
+            Self::FunctionDisas(s) => s.next(),
+        }
+    }
+
+    fn prev(&mut self) {
+        match self {
+            Self::FunctionList(s) => s.prev(),
+            Self::FunctionDisas(s) => s.prev(),
+        }
+    }
 }
 
 pub trait ScreenItem {
     fn list_size(&self) -> usize;
     fn state(&mut self) -> &mut ListState;
     fn draw(&mut self) -> (List, &mut ListState);
-    fn go_in(&self, s: &GlobalState) -> Option<ItemType>;
+    fn go_in(&mut self, s: &GlobalState) -> Option<ItemType>;
 
     fn find(&mut self, _s: &str) {
         crate::log_warn!("Unimplemented!");

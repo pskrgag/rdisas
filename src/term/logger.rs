@@ -13,6 +13,8 @@ pub enum LogType {
 
 type LogEntry = (String, LogType);
 
+const LOG_SIZE: usize = 8;
+
 pub struct Logger {
     log: VecDeque<LogEntry>,
 }
@@ -27,6 +29,9 @@ impl Logger {
     }
 
     pub fn push(&mut self, msg: String, t: LogType) {
+        if self.log.len() == LOG_SIZE {
+            self.log.pop_front();
+        }
         self.log.push_back((msg, t));
     }
 

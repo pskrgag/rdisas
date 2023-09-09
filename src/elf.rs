@@ -32,6 +32,8 @@ pub struct Elf {
 
 impl Elf {
     pub fn new(data: &'static [u8]) -> Option<Self> {
+        const ELF_SYM_STT_FUNC: u8 = 2;
+
         let data = match ElfBytes::<AnyEndian>::minimal_parse(data) {
             Ok(o) => Some(o),
             Err(e) => {
@@ -41,9 +43,25 @@ impl Elf {
         }?;
 
         Self::check_header(&data)?;
+        let (symtab, strtab) = data.symbol_table().ok()??;
 
         Some(Self {
-            functions: HashMap::new(),
+            functions: symtab
+                .iter()
+                .filter(|s| s.st_symtype() == ELF_SYM_STT_FUNC)
+                .map(|sym| {
+                    (
+                        sym.st_value,
+                        (
+                            strtab
+                                .get(sym.st_name as usize)
+                                .unwrap_or("unknown")
+                                .to_owned(),
+                            sym.st_shndx as u64,
+                        )
+                    )
+                })
+                .collect(),
             data,
             sections: None,
         })
@@ -80,28 +98,11 @@ impl Elf {
         Some(self.functions.get(&addr)?.0.clone())
     }
 
-    pub fn function_names(&mut self) -> Option<Functions> {
+    pub fn function_names(&self) -> Option<Functions> {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
         // TODO: optimize that shit!!!!!
         if let Ok(Some((symtab, strtab))) = self.data.symbol_table() {
-            self.functions = symtab
-                .iter()
-                .filter(|s| s.st_symtype() == ELF_SYM_STT_FUNC)
-                .map(|sym| {
-                    (
-                        sym.st_value,
-                        (
-                            strtab
-                                .get(sym.st_name as usize)
-                                .unwrap_or("unknown")
-                                .to_owned(),
-                            sym.st_shndx as u64,
-                        )
-                    )
-                })
-                .collect();
-
             Some(Functions::new(
                 symtab
                     .iter()

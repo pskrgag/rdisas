@@ -108,14 +108,9 @@ impl Term {
         // We know it exist
         let current = self.frame_list.front_mut().unwrap();
 
-        match current {
-            ItemType::FunctionList(c) => {
-                let new = c.go_in(state);
-                if let Some(s) = new {
-                    self.frame_list.push_front(s);
-                }
-            }
-            ItemType::FunctionDisas(_c) => {}
+        let new = current.go_in(state);
+        if let Some(s) = new {
+            self.frame_list.push_front(s);
         }
 
         self.cmd_active = false;
@@ -138,7 +133,10 @@ impl Term {
 
         self.cmd.proccess_char(c);
 
-        self.frame_list.front_mut().unwrap().find(self.cmd.dump_raw());
+        self.frame_list
+            .front_mut()
+            .unwrap()
+            .find(self.cmd.dump_raw());
 
         t.draw(|f| {
             self.draw_ui(f);
