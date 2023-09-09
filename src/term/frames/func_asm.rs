@@ -6,6 +6,7 @@ use capstone::Capstone;
 use capstone::InsnGroupId;
 use capstone::InsnGroupType;
 use capstone::{Insn, Instructions};
+use itertools::Either;
 use std::ops::Range;
 use tui::{
     style::{Color, Style},
@@ -21,10 +22,6 @@ enum BranchInst {
     Jump(u64),
 }
 
-struct InsnMeta {
-    branch: Option<BranchInst>,
-}
-
 pub struct FuncAsm {
     insn_list: Instructions<'static>,
     string_list: Vec<Text<'static>>,
@@ -32,16 +29,14 @@ pub struct FuncAsm {
     name: String,
     cs: &'static Capstone,
     elf: &'static Elf,
-    range_cleanup: Option<Range<usize>>,
+    range_cleanup: Option<(Range<usize>, usize)>,
 }
 
-const ADDRESS_OFFSET: usize = 10;
-
-fn insn_to_string(i: &Insn) -> String {
+fn format_insn(i: &Insn) -> String {
     let mut res = format!("{:#x}:         ", i.address());
 
     if let Some(mnemonic) = i.mnemonic() {
-        res += format!("{} ", mnemonic).as_str();
+        res += format!("{:6} ", mnemonic).as_str();
         if let Some(op_str) = i.op_str() {
             res += format!("{}", op_str).as_str();
         }
@@ -134,21 +129,21 @@ impl FuncAsm {
             }
 
             if let Some(call) = call_name {
-                format!("{}   <{}>", insn_to_string(inst), call).to_string()
+                format!("{}   <{}>", format_insn(inst), call).to_string()
             } else {
-                insn_to_string(inst)
+                format_insn(inst)
             }
         } else {
-            insn_to_string(inst)
+            format_insn(inst)
         }
     }
 
     fn cleanup_jump(&mut self) {
         if let Some(range) = self.range_cleanup.take() {
-            for i in range {
+            for i in range.0 {
                 let text = self.string_list[i].lines[0].spans[0].content.to_mut();
 
-                for j in ADDRESS_OFFSET + 5..text.len() {
+                for j in range.1 + 5..text.len() {
                     let c = unsafe { &mut text.as_bytes_mut()[j] };
                     if *c != b'-' && *c != b'|' && *c != b' ' && *c != b'>' {
                         break;
@@ -163,17 +158,20 @@ impl FuncAsm {
     fn draw_jump(&mut self) {
         let idx = self.state.selected().unwrap();
 
-        log_warn!("I am here");
-
         if let Some(inst) = self.is_branch_inst(&self.insn_list.as_ref()[idx]) {
             match inst {
                 BranchInst::Jump(addr) => {
-                    let self_addr = self.insn_list[idx].address();
+                    // Check that jump belongs to current function
+                    if self.insn_list.as_ref().iter().last().unwrap().address() < addr {
+                        return;
+                    }
 
+                    let self_addr = self.insn_list[idx].address();
                     let text = self.string_list[idx].lines[0].spans[0].content.to_mut();
+                    let addr_offset = text.chars().position(|c| c == ':').unwrap();
 
                     if self.insn_list[idx].address() == addr {
-                        for j in ADDRESS_OFFSET + 5..text.len() {
+                        for j in addr_offset + 5..text.len() {
                             if text.as_bytes()[j] != b' ' {
                                 break;
                             }
@@ -184,59 +182,50 @@ impl FuncAsm {
                         }
                     }
 
-                    if addr < self_addr {
-                        for i in (idx - 1..=0).rev() {
-                            let text = self.string_list[i].lines[0].spans[0].content.to_mut();
-
-                            if self.insn_list[i].address() == addr {
-                                for j in ADDRESS_OFFSET + 5..text.len() {
-                                    if text.as_bytes()[j] != b' ' {
-                                        self.range_cleanup = Some(Range { start: i, end: idx + 1});
-                                        break;
-                                    }
-
-                                    unsafe {
-                                        if text.as_bytes()[j + 1] != b' ' {
-                                            text.as_bytes_mut()[j] = b'>';
-                                        } else {
-                                            text.as_bytes_mut()[j] = b'-';
-                                        }
-                                    }
-                                }
-
-                                break;
-                            }
-
-                            unsafe {
-                                text.as_bytes_mut()[ADDRESS_OFFSET + 5] = b'|';
-                            }
-                        }
+                    for i in if addr < self_addr {
+                        Either::Left((idx - 1..=0).rev())
                     } else {
-                        for i in idx + 1..self.string_list.len() {
-                            let text = self.string_list[i].lines[0].spans[0].content.to_mut();
+                        Either::Right(idx + 1..self.string_list.len())
+                    } {
+                        let text = self.string_list[i].lines[0].spans[0].content.to_mut();
 
-                            if self.insn_list[i].address() == addr {
-                                for j in ADDRESS_OFFSET + 5..text.len() {
-                                    if text.as_bytes()[j] != b' ' {
-                                        self.range_cleanup = Some(Range { start: idx, end: i + 1});
-                                        break;
-                                    }
-
-                                    unsafe {
-                                        if text.as_bytes()[j + 1] != b' ' {
-                                            text.as_bytes_mut()[j] = b'>';
-                                        } else {
-                                            text.as_bytes_mut()[j] = b'-';
-                                        }
-                                    }
+                        if self.insn_list[i].address() == addr {
+                            for j in addr_offset + 5..text.len() {
+                                if text.as_bytes()[j] != b' ' {
+                                    self.range_cleanup = Some(if addr < self_addr {
+                                        (
+                                            Range {
+                                                start: i,
+                                                end: idx + 1,
+                                            },
+                                            addr_offset,
+                                        )
+                                    } else {
+                                        (
+                                            Range {
+                                                start: idx + 1,
+                                                end: i + 1,
+                                            },
+                                            addr_offset,
+                                        )
+                                    });
+                                    break;
                                 }
 
-                                break;
+                                unsafe {
+                                    if text.as_bytes()[j + 1] != b' ' {
+                                        text.as_bytes_mut()[j] = b'>';
+                                    } else {
+                                        text.as_bytes_mut()[j] = b'-';
+                                    }
+                                }
                             }
 
-                            unsafe {
-                                text.as_bytes_mut()[ADDRESS_OFFSET + 5] = b'|';
-                            }
+                            break;
+                        }
+
+                        unsafe {
+                            text.as_bytes_mut()[addr_offset + 5] = b'|';
                         }
                     }
                 }
