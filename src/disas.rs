@@ -83,7 +83,9 @@ impl Disas {
 
         terminal.clear().unwrap();
 
-        self.t.borrow_mut().draw_initial_frame(&mut terminal, f.names());
+        self.t
+            .borrow_mut()
+            .draw_initial_frame(&mut terminal, f.names());
 
         loop {
             let e = wait_event(&self.state);

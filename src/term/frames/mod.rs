@@ -1,13 +1,11 @@
-use tui::{
-    widgets::{ListState, List},
-};
 use crate::disas::GlobalState;
+use tui::widgets::{List, ListState};
 
 pub mod func_asm;
 pub mod func_list;
 
-use func_list::FuncList;
 use func_asm::FuncAsm;
+use func_list::FuncList;
 
 pub enum ItemType {
     FunctionList(FuncList),

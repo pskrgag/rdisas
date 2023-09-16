@@ -58,10 +58,8 @@ impl Logger {
 #[macro_export]
 macro_rules! dump_logger {
     () => {
-        unsafe {
-            crate::term::logger::LOGGER.flush()
-        }
-    }
+        unsafe { crate::term::logger::LOGGER.flush() }
+    };
 }
 
 #[macro_export]

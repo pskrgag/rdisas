@@ -10,7 +10,7 @@ use itertools::Either;
 use std::ops::Range;
 use tui::{
     style::{Color, Style},
-    text::Text,
+    text::{Line, Span, Text},
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
@@ -32,19 +32,6 @@ pub struct FuncAsm {
     range_cleanup: Option<(Range<usize>, usize)>,
 }
 
-fn format_insn(i: &Insn) -> String {
-    let mut res = format!("{:#x}:         ", i.address());
-
-    if let Some(mnemonic) = i.mnemonic() {
-        res += format!("{:6} ", mnemonic).as_str();
-        if let Some(op_str) = i.op_str() {
-            res += format!("{}", op_str).as_str();
-        }
-    }
-
-    res
-}
-
 impl FuncAsm {
     pub fn new(function_name: String, state: &GlobalState) -> Self {
         let (code, addr) = state.elf().func_code(&function_name);
@@ -55,13 +42,31 @@ impl FuncAsm {
             state: ListState::default().with_selected(Some(0)),
             string_list: code
                 .iter()
-                .map(|i| Text::raw(Self::inst_to_string(state, i)))
+                .map(|i| Self::inst_to_string(state, i))
                 .collect(),
             insn_list: code,
             cs: state.capstone(),
             elf: state.elf(),
             range_cleanup: None,
         }
+    }
+
+    fn format_insn(i: &Insn) -> Vec<Span<'static>> {
+        let mut res = format!("{:#x}:         ", i.address());
+        let mut text = vec![Span::from(res)];
+
+        if let Some(mnemonic) = i.mnemonic() {
+            let style = Style::default().fg(Color::Cyan);
+
+            text.push(Span::styled(format!("{:6} ", mnemonic), style));
+
+            if let Some(op_str) = i.op_str() {
+                let style = Style::default().fg(Color::LightCyan);
+                text.push(Span::styled(format!("{}", op_str), style));
+            }
+        }
+
+        text
     }
 
     fn is_branch_inst(&self, inst: &Insn) -> Option<BranchInst> {
@@ -95,7 +100,7 @@ impl FuncAsm {
         None
     }
 
-    fn inst_to_string(c: &GlobalState, inst: &Insn) -> String {
+    fn inst_to_string(c: &GlobalState, inst: &Insn) -> Text<'static> {
         let detail = c.capstone().insn_detail(inst);
 
         if let Ok(d) = detail {
@@ -129,12 +134,15 @@ impl FuncAsm {
             }
 
             if let Some(call) = call_name {
-                format!("{}   <{}>", format_insn(inst), call).to_string()
+                let mut text = Self::format_insn(inst);
+
+                text.push(Span::from(format!("      <{}>", call)));
+                Text::from(Line::from(text))
             } else {
-                format_insn(inst)
+                Text::from(Line::from(Self::format_insn(inst)))
             }
         } else {
-            format_insn(inst)
+            Text::from(Line::from(Self::format_insn(inst)))
         }
     }
 
@@ -167,18 +175,21 @@ impl FuncAsm {
                     }
 
                     let self_addr = self.insn_list[idx].address();
-                    let text = self.string_list[idx].lines[0].spans[0].content.to_mut();
-                    let addr_offset = text.chars().position(|c| c == ':').unwrap();
+                    let text = unsafe {
+                        self.string_list[idx].lines[0].spans[0]
+                            .content
+                            .to_mut()
+                            .as_bytes_mut()
+                    };
+                    let addr_offset = text.iter().position(|c| *c == b':').unwrap();
 
                     if self.insn_list[idx].address() == addr {
                         for j in addr_offset + 5..text.len() {
-                            if text.as_bytes()[j] != b' ' {
+                            if text[j] != b' ' {
                                 break;
                             }
 
-                            unsafe {
-                                text.as_bytes_mut()[j] = b'-';
-                            }
+                            text[j] = b'-';
                         }
                     }
 
@@ -187,11 +198,17 @@ impl FuncAsm {
                     } else {
                         Either::Right(idx + 1..self.string_list.len())
                     } {
-                        let text = self.string_list[i].lines[0].spans[0].content.to_mut();
+                        let text = unsafe {
+                            self.string_list[i].lines[0].spans[0]
+                                .content
+                                .to_mut()
+                                .as_bytes_mut()
+                        };
 
                         if self.insn_list[i].address() == addr {
                             for j in addr_offset + 5..text.len() {
-                                if text.as_bytes()[j] != b' ' {
+                                if j == text.len() - 1 {
+                                    text[j] = b'>';
                                     self.range_cleanup = Some(if addr < self_addr {
                                         (
                                             Range {
@@ -209,24 +226,15 @@ impl FuncAsm {
                                             addr_offset,
                                         )
                                     });
-                                    break;
-                                }
-
-                                unsafe {
-                                    if text.as_bytes()[j + 1] != b' ' {
-                                        text.as_bytes_mut()[j] = b'>';
-                                    } else {
-                                        text.as_bytes_mut()[j] = b'-';
-                                    }
+                                } else {
+                                    text[j] = b'-';
                                 }
                             }
 
                             break;
                         }
 
-                        unsafe {
-                            text.as_bytes_mut()[addr_offset + 5] = b'|';
-                        }
+                        text[addr_offset + 5] = b'|';
                     }
                 }
                 _ => {}

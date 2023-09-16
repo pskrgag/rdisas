@@ -58,7 +58,7 @@ impl Elf {
                                 .unwrap_or("unknown")
                                 .to_owned(),
                             sym.st_shndx as u64,
-                        )
+                        ),
                     )
                 })
                 .collect(),

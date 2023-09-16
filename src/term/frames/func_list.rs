@@ -16,13 +16,13 @@ impl FuncList {
     pub fn new(l: Vec<String>) -> Self {
         let mut cnt = 0;
         let func_list: Vec<_> = l
-                .into_iter()
-                .map(|x| {
-                    let new = (cnt, x);
-                    cnt += 1;
-                    new
-                })
-                .collect();
+            .into_iter()
+            .map(|x| {
+                let new = (cnt, x);
+                cnt += 1;
+                new
+            })
+            .collect();
 
         Self {
             state: ListState::default().with_selected(Some(0)),
