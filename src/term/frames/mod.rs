@@ -1,4 +1,5 @@
-use crate::disas::GlobalState;
+use crate::elf::Elf;
+use capstone::Capstone;
 use tui::widgets::{List, ListState};
 
 pub mod func_asm;
@@ -13,10 +14,10 @@ pub enum ItemType {
 }
 
 impl ScreenItem for ItemType {
-    fn go_in(&mut self, s: &GlobalState) -> Option<ItemType> {
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType> {
         match self {
-            Self::FunctionList(e) => e.go_in(s),
-            Self::FunctionDisas(e) => e.go_in(s),
+            Self::FunctionList(e) => e.go_in(elf, cs, state),
+            Self::FunctionDisas(e) => e.go_in(elf, cs, state),
         }
     }
 
@@ -27,79 +28,36 @@ impl ScreenItem for ItemType {
         }
     }
 
-    fn state(&mut self) -> &mut ListState {
-        match self {
-            Self::FunctionList(s) => s.state(),
-            Self::FunctionDisas(s) => s.state(),
-        }
-    }
-
-    fn draw(&mut self) -> (List, &mut ListState) {
+    fn draw(&self) -> List {
         match self {
             Self::FunctionList(s) => s.draw(),
             Self::FunctionDisas(s) => s.draw(),
         }
     }
 
-    fn find(&mut self, st: &str) {
+    fn find(&mut self, state: &mut ListState, ss: &str) {
         match self {
-            Self::FunctionList(s) => s.find(st),
-            Self::FunctionDisas(s) => s.find(st),
+            Self::FunctionList(s) => s.find(state, ss),
+            Self::FunctionDisas(s) => s.find(state, ss),
         }
     }
 
-    fn next(&mut self) {
+    fn cursor_move(&mut self, state: &ListState) {
         match self {
-            Self::FunctionList(s) => s.next(),
-            Self::FunctionDisas(s) => s.next(),
-        }
-    }
-
-    fn prev(&mut self) {
-        match self {
-            Self::FunctionList(s) => s.prev(),
-            Self::FunctionDisas(s) => s.prev(),
+            Self::FunctionList(s) => s.cursor_move(state),
+            Self::FunctionDisas(s) => s.cursor_move(state),
         }
     }
 }
 
 pub trait ScreenItem {
     fn list_size(&self) -> usize;
-    fn state(&mut self) -> &mut ListState;
-    fn draw(&mut self) -> (List, &mut ListState);
-    fn go_in(&mut self, s: &GlobalState) -> Option<ItemType>;
+    fn draw(&self) -> List;
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType>;
 
-    fn find(&mut self, _s: &str) {
+    fn cursor_move(&mut self, _state: &ListState) {}
+
+    fn find(&mut self, _state: &mut ListState, _s: &str) {
         crate::log_warn!("Unimplemented!");
-    }
-
-    fn next(&mut self) {
-        let size = self.list_size();
-        let s = self.state();
-        let selected = s.selected().unwrap();
-
-        s.select(Some(next_state(size, selected)));
-    }
-
-    fn prev(&mut self) {
-        let size = self.list_size();
-        let s = self.state();
-        let selected = s.selected().unwrap();
-
-        s.select(Some(prev_state(size, selected)));
-    }
-}
-
-// Helper functions
-
-fn next_state(size: usize, state: usize) -> usize {
-    (state + 1) % size
-}
-
-fn prev_state(size: usize, state: usize) -> usize {
-    if state == 0 {
-        size - 1
-    } else {
-        state - 1
     }
 }

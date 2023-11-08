@@ -1,4 +1,4 @@
-use crate::disas::State;
+use crate::app::State;
 use crossterm::event::{read, Event, KeyCode, KeyEvent};
 
 #[derive(PartialEq, Eq)]

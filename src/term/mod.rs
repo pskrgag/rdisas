@@ -1,5 +1,6 @@
 pub mod events;
-pub mod term;
+pub mod tui;
+pub mod ui;
 
 #[macro_use]
 pub mod logger;

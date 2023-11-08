@@ -1,6 +1,7 @@
 use super::func_asm::FuncAsm;
 use super::{ItemType, ScreenItem};
-use crate::disas::GlobalState;
+use crate::elf::Elf;
+use capstone::Capstone;
 use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
@@ -8,7 +9,6 @@ use tui::{
 
 pub struct FuncList {
     func_list: Vec<(usize, String)>, // Should be smth better for prefix finding
-    state: ListState,
     ui_list: Vec<ListItem<'static>>,
 }
 
@@ -25,7 +25,6 @@ impl FuncList {
             .collect();
 
         Self {
-            state: ListState::default().with_selected(Some(0)),
             ui_list: func_list
                 .iter()
                 .map(|i| ListItem::new(i.1.clone()))
@@ -36,7 +35,7 @@ impl FuncList {
 }
 
 impl ScreenItem for FuncList {
-    fn draw(&mut self) -> (List, &mut ListState) {
+    fn draw(&self) -> List {
         let list = List::new(self.ui_list.clone())
             .block(
                 Block::default()
@@ -46,32 +45,27 @@ impl ScreenItem for FuncList {
             .style(Style::default().fg(Color::White))
             .highlight_style(Style::default().bg(Color::Cyan));
 
-        (list, &mut self.state)
-    }
-
-    fn state(&mut self) -> &mut ListState {
-        &mut self.state
+        list
     }
 
     fn list_size(&self) -> usize {
         self.func_list.len()
     }
 
-    fn go_in(&mut self, state: &GlobalState) -> Option<ItemType> {
-        let s = self.state.selected().unwrap();
-        let new = FuncAsm::new(self.func_list[s].1.clone(), &state);
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType> {
+        let new = FuncAsm::new(self.func_list[state.selected().unwrap()].1.clone(), elf, cs);
 
         Some(ItemType::FunctionDisas(new))
     }
 
-    fn find(&mut self, s: &str) {
+    fn find(&mut self, state: &mut ListState, s: &str) {
         // use fuzzy_match::fuzzy_match;
 
         log_info!("Tryng to find {}", s);
 
-        for i in self.state.selected().unwrap()..self.func_list.len() {
+        for i in state.selected().unwrap()..self.func_list.len() {
             if self.func_list[i].1.contains(s) {
-                self.state.select(Some(i));
+                state.select(Some(i));
                 break;
             }
         }

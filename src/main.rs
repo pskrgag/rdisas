@@ -1,9 +1,7 @@
-#![feature(return_position_impl_trait_in_trait)]
-
 use memmap::MmapOptions;
 use std::env;
 
-mod disas;
+mod app;
 mod elf;
 mod term;
 
@@ -39,7 +37,7 @@ fn main() {
     }
     .unwrap();
 
-    let e = match elf::Elf::new(Box::leak(Box::new(mmap_data))) {
+    let mut e = match elf::Elf::new(Box::leak(Box::new(mmap_data))) {
         Some(e) => Some(e),
         None => {
             error!("Failed to create elf");
@@ -48,7 +46,20 @@ fn main() {
     }
     .unwrap();
 
-    let d = disas::Disas::new(args[1].clone(), e).unwrap();
+    e.load_sections();
 
-    d.exec();
+    let mut app = app::App::new(e).unwrap();
+    let mut tui = term::tui::Tui::new().unwrap();
+
+    tui.draw(&mut app);
+
+    loop {
+        let e = tui.next_event(app.state());
+
+        if app.proccess_event(e) == true {
+            break;
+        }
+
+        tui.draw(&mut app);
+    }
 }

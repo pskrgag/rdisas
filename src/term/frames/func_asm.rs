@@ -1,5 +1,4 @@
 use super::{ItemType, ScreenItem};
-use crate::disas::GlobalState;
 use crate::elf::Elf;
 use capstone::arch;
 use capstone::Capstone;
@@ -25,34 +24,30 @@ enum BranchInst {
 pub struct FuncAsm {
     insn_list: Instructions<'static>,
     string_list: Vec<Text<'static>>,
-    state: ListState,
     name: String,
-    cs: &'static Capstone,
-    elf: &'static Elf,
     range_cleanup: Option<(Range<usize>, usize)>,
+    cs: &'static Capstone,
 }
 
 impl FuncAsm {
-    pub fn new(function_name: String, state: &GlobalState) -> Self {
-        let (code, addr) = state.elf().func_code(&function_name);
-        let code = state.capstone().disasm_all(code, addr).unwrap();
+    pub fn new(function_name: String, elf: &Elf, cs: &'static Capstone) -> Self {
+        let (code, addr) = elf.func_code(&function_name);
+        let code = cs.disasm_all(code, addr).unwrap();
 
         Self {
+            cs,
             name: function_name,
-            state: ListState::default().with_selected(Some(0)),
             string_list: code
                 .iter()
-                .map(|i| Self::inst_to_string(state, i))
+                .map(|i| Self::inst_to_string(cs, elf, i))
                 .collect(),
             insn_list: code,
-            cs: state.capstone(),
-            elf: state.elf(),
             range_cleanup: None,
         }
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
-        let mut res = format!("{:#x}:         ", i.address());
+        let res = format!("{:#x}:         ", i.address());
         let mut text = vec![Span::from(res)];
 
         if let Some(mnemonic) = i.mnemonic() {
@@ -100,8 +95,8 @@ impl FuncAsm {
         None
     }
 
-    fn inst_to_string(c: &GlobalState, inst: &Insn) -> Text<'static> {
-        let detail = c.capstone().insn_detail(inst);
+    fn inst_to_string(c: &Capstone, elf: &Elf, inst: &Insn) -> Text<'static> {
+        let detail = c.insn_detail(inst);
 
         if let Ok(d) = detail {
             let group = d.groups();
@@ -113,9 +108,7 @@ impl FuncAsm {
                         for op in d.arch_detail().operands() {
                             if let arch::ArchOperand::X86Operand(op) = op {
                                 if let arch::x86::X86OperandType::Imm(x) = op.op_type {
-                                    let e = c.elf();
-
-                                    call_name = e.function_name_by_addr(x as u64);
+                                    call_name = elf.function_name_by_addr(x as u64);
 
                                     log_info!(
                                         "Found call inst at addr {} to 0x{:x}",
@@ -163,8 +156,8 @@ impl FuncAsm {
         }
     }
 
-    fn draw_jump(&mut self) {
-        let idx = self.state.selected().unwrap();
+    fn draw_jump(&mut self, state: &ListState) {
+        let idx = state.selected().unwrap();
 
         if let Some(inst) = self.is_branch_inst(&self.insn_list.as_ref()[idx]) {
             match inst {
@@ -244,7 +237,7 @@ impl FuncAsm {
 }
 
 impl ScreenItem for FuncAsm {
-    fn draw(&mut self) -> (List, &mut ListState) {
+    fn draw(&self) -> List {
         let list = List::new(
             self.string_list
                 .clone()
@@ -260,48 +253,27 @@ impl ScreenItem for FuncAsm {
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().bg(Color::Cyan));
 
-        (list, &mut self.state)
-    }
-
-    fn state(&mut self) -> &mut ListState {
-        &mut self.state
+        list
     }
 
     fn list_size(&self) -> usize {
         self.insn_list.len()
     }
 
-    fn next(&mut self) {
-        let size = self.list_size();
-        let s = &self.state;
-        let selected = s.selected().unwrap();
-
+    fn cursor_move(&mut self, state: &ListState) {
         self.cleanup_jump();
-
-        self.state.select(Some(next_state(size, selected)));
-        self.draw_jump();
+        self.draw_jump(state);
     }
 
-    fn prev(&mut self) {
-        let size = self.list_size();
-        let s = &self.state;
-        let selected = s.selected().unwrap();
-
-        self.cleanup_jump();
-
-        self.state.select(Some(prev_state(size, selected)));
-        self.draw_jump();
-    }
-
-    fn go_in(&mut self, state: &GlobalState) -> Option<ItemType> {
-        let idx = self.state.selected().unwrap();
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType> {
+        let idx = state.selected().unwrap();
         self.cleanup_jump();
 
         if let Some(inst) = self.is_branch_inst(&self.insn_list.as_ref()[idx]) {
             match inst {
                 BranchInst::Call(addr) => {
-                    let call_name = self.elf.function_name_by_addr(addr).unwrap();
-                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, state)))
+                    let call_name = elf.function_name_by_addr(addr).unwrap();
+                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, elf, cs)))
                 }
                 BranchInst::Jump(addr) => {
                     let self_addr = self.insn_list[idx].address();
@@ -311,14 +283,12 @@ impl ScreenItem for FuncAsm {
                     if addr < self_addr {
                         for i in (idx..=0).rev() {
                             if self.insn_list[i].address() == addr {
-                                self.state.select(Some(i));
                                 break;
                             }
                         }
                     } else {
                         for i in idx..self.insn_list.len() {
                             if self.insn_list[i].address() == addr {
-                                self.state.select(Some(i));
                                 break;
                             }
                         }
@@ -330,16 +300,5 @@ impl ScreenItem for FuncAsm {
         } else {
             None
         }
-    }
-}
-
-fn next_state(size: usize, state: usize) -> usize {
-    (state + 1) % size
-}
-fn prev_state(size: usize, state: usize) -> usize {
-    if state == 0 {
-        size - 1
-    } else {
-        state - 1
     }
 }
