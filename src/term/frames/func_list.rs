@@ -51,7 +51,12 @@ impl ScreenItem for FuncList {
         self.func_list.len()
     }
 
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType> {
+    fn go_in(
+        &mut self,
+        elf: &Elf,
+        cs: &'static Capstone,
+        state: &mut ListState,
+    ) -> Option<ItemType> {
         let new = FuncAsm::new(self.func_list[state.selected().unwrap()].1.clone(), elf, cs);
 
         Some(ItemType::FunctionDisas(new))

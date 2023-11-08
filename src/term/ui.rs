@@ -1,11 +1,11 @@
 use crate::app::{App, State};
 use crate::term::frames::ScreenItem;
 use crate::term::tui::Backend;
+use tui::widgets::{Block, Borders};
 use tui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
 };
-use tui::widgets::{Block, Borders};
 
 pub type Frame<'a> = tui::Frame<'a, Backend>;
 
@@ -35,15 +35,9 @@ pub fn render(app: &mut App, f: &mut Frame) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Blue));
 
-        f.render_stateful_widget(
-            list.block(block),
-            chunks[idx],
-            &mut fr.1,
-        );
+        f.render_stateful_widget(list.block(block), chunks[idx], &mut fr.1);
     } else {
-        let block = Block::default()
-            .title(fr.0.title())
-            .borders(Borders::ALL);
+        let block = Block::default().title(fr.0.title()).borders(Borders::ALL);
 
         f.render_stateful_widget(list.block(block), chunks[idx], &mut fr.1);
     }
@@ -66,9 +60,7 @@ pub fn render(app: &mut App, f: &mut Frame) {
 
         f.render_widget(cmd.block(block), chunks[idx]);
     } else {
-        let block = Block::default()
-            .title("Cmd")
-            .borders(Borders::ALL);
+        let block = Block::default().title("Cmd").borders(Borders::ALL);
 
         f.render_widget(cmd.block(block), chunks[idx]);
     }

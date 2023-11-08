@@ -47,7 +47,7 @@ impl FuncAsm {
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
-        let res = format!("{:#x}:         ", i.address());
+        let res = format!("{0: <30x}", i.address());
         let mut text = vec![Span::from(res)];
 
         if let Some(mnemonic) = i.mnemonic() {
@@ -264,7 +264,12 @@ impl ScreenItem for FuncAsm {
         self.draw_jump(state);
     }
 
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType> {
+    fn go_in(
+        &mut self,
+        elf: &Elf,
+        cs: &'static Capstone,
+        state: &mut ListState,
+    ) -> Option<ItemType> {
         let idx = state.selected().unwrap();
         self.cleanup_jump();
 

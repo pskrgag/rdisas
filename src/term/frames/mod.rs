@@ -14,7 +14,12 @@ pub enum ItemType {
 }
 
 impl ScreenItem for ItemType {
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType> {
+    fn go_in(
+        &mut self,
+        elf: &Elf,
+        cs: &'static Capstone,
+        state: &mut ListState,
+    ) -> Option<ItemType> {
         match self {
             Self::FunctionList(e) => e.go_in(elf, cs, state),
             Self::FunctionDisas(e) => e.go_in(elf, cs, state),
@@ -61,7 +66,12 @@ pub trait ScreenItem {
     fn title(&self) -> String;
     fn list_size(&self) -> usize;
     fn draw(&self) -> List;
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType>;
+    fn go_in(
+        &mut self,
+        elf: &Elf,
+        cs: &'static Capstone,
+        state: &mut ListState,
+    ) -> Option<ItemType>;
 
     fn cursor_move(&mut self, _state: &ListState) {}
 

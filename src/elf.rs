@@ -13,6 +13,16 @@ pub struct Functions<'a> {
     list: Vec<(&'a str, Symbol)>,
 }
 
+// TODO: extend maybe?
+pub enum Arch {
+    X86,
+    X86_64,
+    Arm64,
+    Arm,
+    Riscv,
+    Mips,
+}
+
 impl<'a> Functions<'a> {
     pub fn new(list: Vec<(&'a str, Symbol)>) -> Self {
         Self { list }
@@ -42,7 +52,6 @@ impl Elf {
             }
         }?;
 
-        Self::check_header(&data)?;
         let (symtab, strtab) = data.symbol_table().ok()??;
 
         Some(Self {
@@ -67,30 +76,20 @@ impl Elf {
         })
     }
 
-    pub fn load_sections(&mut self) -> Option<()> {
-        self.sections = Some(self.data.section_headers()?);
-        Some(())
+    pub fn arch(&self) -> Arch {
+        match self.data.ehdr.e_machine {
+            0x3e => Arch::X86_64,
+            0x03 => Arch::X86,
+            0xb7 => Arch::Arm64,
+            0x28 => Arch::Arm,
+            0xF3 => Arch::Riscv,
+            0x08 => Arch::Mips,
+            _ => panic!("Idk"),
+        }
     }
 
-    fn check_header(e: &ElfBytes<AnyEndian>) -> Option<()> {
-        let hdr = e.ehdr;
-
-        match hdr.class {
-            Class::ELF64 => Some(()),
-            _ => {
-                error!("Elf header class is not 64bit");
-                None
-            }
-        }?;
-
-        match hdr.e_machine {
-            183 | 62 => Some(()),
-            other => {
-                error!("Does not support {}", other);
-                None
-            }
-        }?;
-
+    pub fn load_sections(&mut self) -> Option<()> {
+        self.sections = Some(self.data.section_headers()?);
         Some(())
     }
 
@@ -133,7 +132,8 @@ impl Elf {
             .unwrap();
 
         for i in symtab {
-            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
+            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name
+            {
                 return (
                     &self
                         .data

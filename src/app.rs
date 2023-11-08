@@ -1,5 +1,5 @@
 use super::term::cmd::CommandLine;
-use crate::elf::Elf;
+use crate::elf::{Arch, Elf};
 use crate::term::events::KeyboardEvent;
 use crate::term::frames::func_list::*;
 use capstone::prelude::*;
@@ -19,8 +19,8 @@ pub struct App {
     frame_list: LinkedList<(ItemType, ListState)>, // Like a cache for now
     elf: Elf,
 
-    /* I am done with rust lifetimes. I need to keep references 
-     * to instructions in Disassembly frame, but poisoning whole struct 
+    /* I am done with rust lifetimes. I need to keep references
+     * to instructions in Disassembly frame, but poisoning whole struct
      * with lifetime makes things x10 harder.
      */
     cs: &'static Capstone,
@@ -91,15 +91,32 @@ impl App {
         let funcs = elf.function_names()?;
         let list = FuncList::new(funcs.names());
 
+        let cs = match elf.arch() {
+            Arch::X86 => Capstone::new()
+                .x86()
+                .mode(arch::x86::ArchMode::Mode32)
+                .detail(true)
+                .build()
+                .ok()?,
+            Arch::X86_64 => Capstone::new()
+                .x86()
+                .mode(arch::x86::ArchMode::Mode32)
+                .detail(true)
+                .build()
+                .ok()?,
+            Arch::Arm64 => Capstone::new()
+                .arm64()
+                .mode(arch::arm64::ArchMode::Arm)
+                .detail(true)
+                .build()
+                .ok()?,
+            Arch::Arm => Capstone::new().arm().detail(true).build().ok()?,
+            Arch::Riscv => Capstone::new().riscv().detail(true).build().ok()?,
+            Arch::Mips => Capstone::new().mips().detail(true).build().ok()?,
+        };
+
         let mut s = Self {
-            cs: Box::leak(Box::new(
-                Capstone::new()
-                    .x86()
-                    .mode(arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .ok()?,
-            )),
+            cs: Box::leak(Box::new(cs)),
             frame_list: LinkedList::new(),
             cmd: CommandLine::new(),
             state: State::Control,
