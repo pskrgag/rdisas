@@ -35,13 +35,12 @@ impl FuncList {
 }
 
 impl ScreenItem for FuncList {
+    fn title(&self) -> String {
+        "Function list".to_owned()
+    }
+
     fn draw(&self) -> List {
         let list = List::new(self.ui_list.clone())
-            .block(
-                Block::default()
-                    .title("Function list")
-                    .borders(Borders::ALL),
-            )
             .style(Style::default().fg(Color::White))
             .highlight_style(Style::default().bg(Color::Cyan));
 
@@ -52,7 +51,7 @@ impl ScreenItem for FuncList {
         self.func_list.len()
     }
 
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType> {
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType> {
         let new = FuncAsm::new(self.func_list[state.selected().unwrap()].1.clone(), elf, cs);
 
         Some(ItemType::FunctionDisas(new))

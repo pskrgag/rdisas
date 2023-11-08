@@ -1,4 +1,4 @@
-use tui::widgets::{Block, Borders, Paragraph};
+use tui::widgets::Paragraph;
 
 pub struct CommandLine {
     buffer: String,
@@ -26,8 +26,6 @@ impl CommandLine {
 
     pub fn dump(&self) -> Paragraph {
         Paragraph::new(self.buffer.clone())
-            .block(Block::default().title("Find").borders(Borders::ALL))
-            .scroll((self.buffer.len() as u16, 0))
     }
 
     pub fn clear(&mut self) {

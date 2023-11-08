@@ -18,6 +18,11 @@ pub enum State {
 pub struct App {
     frame_list: LinkedList<(ItemType, ListState)>, // Like a cache for now
     elf: Elf,
+
+    /* I am done with rust lifetimes. I need to keep references 
+     * to instructions in Disassembly frame, but poisoning whole struct 
+     * with lifetime makes things x10 harder.
+     */
     cs: &'static Capstone,
     state: State,
 
@@ -108,11 +113,13 @@ impl App {
     pub fn next_elem(&mut self) {
         let fr = self.active_main_frame();
         Self::next_state(&fr.0, &mut fr.1);
+        fr.0.cursor_move(&fr.1);
     }
 
     pub fn prev_elem(&mut self) {
         let fr = self.active_main_frame();
         Self::prev_state(&fr.0, &mut fr.1);
+        fr.0.cursor_move(&fr.1);
     }
 
     pub fn prev_frame(&mut self) {

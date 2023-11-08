@@ -5,6 +5,7 @@ use tui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
 };
+use tui::widgets::{Block, Borders};
 
 pub type Frame<'a> = tui::Frame<'a, Backend>;
 
@@ -21,20 +22,54 @@ pub fn render(app: &mut App, f: &mut Frame) {
             .as_ref(),
         );
 
+    let state = app.state();
+    let mut idx = 0;
+
     let chunks = layout.split(f.size());
     let fr = app.active_main_frame();
     let list = fr.0.draw();
 
-    f.render_stateful_widget(list, chunks[0], &mut fr.1);
+    if state == State::Control {
+        let block = Block::default()
+            .title(fr.0.title())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Blue));
 
-    let debug = crate::dump_logger!();
-    f.render_widget(debug, chunks[1]);
+        f.render_stateful_widget(
+            list.block(block),
+            chunks[idx],
+            &mut fr.1,
+        );
+    } else {
+        let block = Block::default()
+            .title(fr.0.title())
+            .borders(Borders::ALL);
+
+        f.render_stateful_widget(list.block(block), chunks[idx], &mut fr.1);
+    }
+
+    idx += 1;
+
+    {
+        let debug = crate::dump_logger!();
+        f.render_widget(debug, chunks[idx]);
+        idx += 1;
+    }
 
     let cmd = app.cmd.dump();
 
-    if app.state() == State::Control {
-        f.render_widget(cmd.style(Style::default().fg(Color::Blue)), chunks[2]);
+    if state == State::Insert {
+        let block = Block::default()
+            .title("Cmd")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Blue));
+
+        f.render_widget(cmd.block(block), chunks[idx]);
     } else {
-        f.render_widget(cmd, chunks[2]);
+        let block = Block::default()
+            .title("Cmd")
+            .borders(Borders::ALL);
+
+        f.render_widget(cmd.block(block), chunks[idx]);
     }
 }

@@ -56,7 +56,7 @@ impl FuncAsm {
             text.push(Span::styled(format!("{:6} ", mnemonic), style));
 
             if let Some(op_str) = i.op_str() {
-                let style = Style::default().fg(Color::LightCyan);
+                let style = Style::default().fg(Color::Magenta);
                 text.push(Span::styled(op_str.to_string(), style));
             }
         }
@@ -237,6 +237,10 @@ impl FuncAsm {
 }
 
 impl ScreenItem for FuncAsm {
+    fn title(&self) -> String {
+        format!("Disassembly of {}", self.name)
+    }
+
     fn draw(&self) -> List {
         let list = List::new(
             self.string_list
@@ -244,11 +248,6 @@ impl ScreenItem for FuncAsm {
                 .into_iter()
                 .map(ListItem::new)
                 .collect::<Vec<ListItem>>(),
-        )
-        .block(
-            Block::default()
-                .title(format!("Disassembly of {}", self.name))
-                .borders(Borders::ALL),
         )
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().bg(Color::Cyan));
@@ -265,7 +264,7 @@ impl ScreenItem for FuncAsm {
         self.draw_jump(state);
     }
 
-    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &ListState) -> Option<ItemType> {
+    fn go_in(&mut self, elf: &Elf, cs: &'static Capstone, state: &mut ListState) -> Option<ItemType> {
         let idx = state.selected().unwrap();
         self.cleanup_jump();
 
@@ -283,12 +282,14 @@ impl ScreenItem for FuncAsm {
                     if addr < self_addr {
                         for i in (idx..=0).rev() {
                             if self.insn_list[i].address() == addr {
+                                state.select(Some(i));
                                 break;
                             }
                         }
                     } else {
                         for i in idx..self.insn_list.len() {
                             if self.insn_list[i].address() == addr {
+                                state.select(Some(i));
                                 break;
                             }
                         }
