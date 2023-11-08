@@ -10,7 +10,7 @@ use std::ops::Range;
 use tui::{
     style::{Color, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{List, ListItem, ListState},
 };
 
 const CALL_INST: u8 = InsnGroupType::CS_GRP_CALL as u8;
@@ -47,7 +47,7 @@ impl FuncAsm {
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
-        let res = format!("{0: <30x}", i.address());
+        let res = format!("0x{0: <30x}", i.address());
         let mut text = vec![Span::from(res)];
 
         if let Some(mnemonic) = i.mnemonic() {
@@ -250,7 +250,7 @@ impl ScreenItem for FuncAsm {
                 .collect::<Vec<ListItem>>(),
         )
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().bg(Color::Cyan));
+        .highlight_style(Style::default().bg(Color::DarkGray));
 
         list
     }

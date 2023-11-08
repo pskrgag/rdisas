@@ -4,7 +4,7 @@ use crate::elf::Elf;
 use capstone::Capstone;
 use tui::{
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{List, ListItem, ListState},
 };
 
 pub struct FuncList {
@@ -42,7 +42,7 @@ impl ScreenItem for FuncList {
     fn draw(&self) -> List {
         let list = List::new(self.ui_list.clone())
             .style(Style::default().fg(Color::White))
-            .highlight_style(Style::default().bg(Color::Cyan));
+            .highlight_style(Style::default().bg(Color::DarkGray));
 
         list
     }

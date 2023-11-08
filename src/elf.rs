@@ -1,5 +1,4 @@
 use elf::endian::AnyEndian;
-use elf::file::*;
 use elf::section::{SectionHeader, SectionHeaderTable};
 use elf::symbol::Symbol;
 use elf::ElfBytes;

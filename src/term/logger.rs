@@ -5,6 +5,7 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
 };
 
+#[allow(dead_code)]
 pub enum LogType {
     Info,
     Warn,
@@ -21,6 +22,7 @@ pub struct Logger {
 
 pub static mut LOGGER: Logger = Logger::new();
 
+#[allow(dead_code)]
 impl Logger {
     pub const fn new() -> Self {
         Self {
