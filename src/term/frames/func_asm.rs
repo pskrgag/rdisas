@@ -57,7 +57,7 @@ impl FuncAsm {
 
             if let Some(op_str) = i.op_str() {
                 let style = Style::default().fg(Color::LightCyan);
-                text.push(Span::styled(format!("{}", op_str), style));
+                text.push(Span::styled(op_str.to_string(), style));
             }
         }
 
@@ -242,7 +242,7 @@ impl ScreenItem for FuncAsm {
             self.string_list
                 .clone()
                 .into_iter()
-                .map(|x| ListItem::new(x))
+                .map(ListItem::new)
                 .collect::<Vec<ListItem>>(),
         )
         .block(

@@ -58,7 +58,7 @@ impl Logger {
 #[macro_export]
 macro_rules! dump_logger {
     () => {
-        unsafe { crate::term::logger::LOGGER.flush() }
+        unsafe { $crate::term::logger::LOGGER.flush() }
     };
 }
 
@@ -66,7 +66,7 @@ macro_rules! dump_logger {
 macro_rules! log_info {
     ($fmt:expr, $($args:tt)*) => {
         unsafe {
-            crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), crate::term::logger::LogType::Info);
+            $crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), $crate::term::logger::LogType::Info);
         }
     };
     ($fmt:expr) => {
@@ -80,7 +80,7 @@ macro_rules! log_info {
 macro_rules! log_debug {
     ($fmt:expr, $($arg:expr),*) => {
         unsafe {
-            crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), crate::term::logger::LogType::Debug);
+            $crate::term::logger::LOGGER.push(format!("{}", format_args!($fmt, $($args)*)), $crate::term::logger::LogType::Debug);
         }
     };
     ($fmt:expr) => {
@@ -94,7 +94,7 @@ macro_rules! log_debug {
 macro_rules! log_warn {
     ($fmt:expr, $($arg:expr),*) => {
         unsafe {
-            crate::term::logger::LOGGER.push(format!($fmt, $(unsafe_render(&$arg)),*), crate::term::logger::LogType::Warn);
+            $crate::term::logger::LOGGER.push(format!($fmt, $(unsafe_render(&$arg)),*), $crate::term::logger::LogType::Warn);
         }
     };
     ($fmt:expr) => {

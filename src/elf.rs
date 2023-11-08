@@ -133,17 +133,15 @@ impl Elf {
             .unwrap();
 
         for i in symtab {
-            if i.st_symtype() == ELF_SYM_STT_FUNC {
-                if strtab.get(i.st_name as usize).unwrap() == name {
-                    return (
-                        &self
-                            .data
-                            .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
-                            .unwrap()
-                            .0[i.st_value as usize..i.st_size as usize],
-                        i.st_value,
-                    );
-                }
+            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name {
+                return (
+                    &self
+                        .data
+                        .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
+                        .unwrap()
+                        .0[i.st_value as usize..i.st_size as usize],
+                    i.st_value,
+                );
             }
         }
 

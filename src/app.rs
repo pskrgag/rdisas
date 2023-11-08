@@ -127,7 +127,7 @@ impl App {
         // We know it exist
         let (fr, state) = self.frame_list.front_mut().unwrap();
 
-        let new = fr.go_in(&self.elf, self.cs, &state);
+        let new = fr.go_in(&self.elf, self.cs, state);
         if let Some(s) = new {
             self.frame_list
                 .push_front((s, ListState::default().with_selected(Some(0))));

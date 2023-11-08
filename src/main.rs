@@ -56,7 +56,7 @@ fn main() {
     loop {
         let e = tui.next_event(app.state());
 
-        if app.proccess_event(e) == true {
+        if app.proccess_event(e) {
             break;
         }
 
