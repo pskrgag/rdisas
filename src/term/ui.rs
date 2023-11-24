@@ -15,7 +15,9 @@ pub fn render(app: &mut App, f: &mut Frame) {
         .margin(1)
         .constraints(
             [
-                Constraint::Percentage(95),
+                Constraint::Percentage(80),
+                Constraint::Percentage(15),
+
                 Constraint::Percentage(5),
             ]
             .as_ref(),
@@ -43,11 +45,11 @@ pub fn render(app: &mut App, f: &mut Frame) {
 
     idx += 1;
 
-    // {
-    //     let debug = crate::dump_logger!();
-    //     f.render_widget(debug, chunks[idx]);
-    //     idx += 1;
-    // }
+    {
+        let debug = crate::dump_logger!();
+        f.render_widget(debug, chunks[idx]);
+        idx += 1;
+    }
 
     let cmd = app.cmd.dump();
 

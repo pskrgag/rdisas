@@ -156,20 +156,52 @@ impl Elf {
             .expect("Failed to get symbol table")
             .unwrap();
 
-        for i in symtab {
+        for i in symtab.iter() {
             if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name
             {
                 let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
 
                 let start = (i.st_value - target_section.sh_addr) as usize;
-                let end = start + i.st_size as usize;
+                let mut end = start + i.st_size as usize;
+
+                // If compiler does not set size for function, simply look up next label
+                // in the same section
+                if start == end {
+                    let mut next_sym: Option<Symbol> = None;
+
+                    for j in symtab {
+                        if j.st_symtype() == ELF_SYM_STT_FUNC
+                            && i.st_shndx == j.st_shndx
+                            && j.st_value > i.st_value
+                        {
+                            if let Some(ref s) = next_sym.as_ref() {
+                                if j.st_value < s.st_value {
+                                    next_sym = Some(j)
+                                }
+                            } else {
+                                next_sym = Some(j);
+                            }
+                        }
+
+                        if let Some(ref s) = next_sym.as_ref() {
+                            end = (s.st_value - target_section.sh_addr) as usize;
+                        }
+                    }
+                }
 
                 crate::log_info!("Found {} at addr {}", name, i.st_value);
 
-                return (
-                    &self.data.section_data(target_section).unwrap().0[start..end],
-                    i.st_value,
-                );
+                if start != end {
+                    return (
+                        &self.data.section_data(target_section).unwrap().0[start..end],
+                        i.st_value,
+                    );
+                } else {
+                    return (
+                        &self.data.section_data(target_section).unwrap().0[start..],
+                        i.st_value,
+                    );
+                }
             }
         }
 
