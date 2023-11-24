@@ -1,5 +1,5 @@
 use super::{ItemType, ScreenItem};
-use crate::elf::Elf;
+use crate::elf::{Arch, Elf};
 use capstone::arch;
 use capstone::Capstone;
 use capstone::InsnGroupId;
@@ -27,6 +27,7 @@ pub struct FuncAsm {
     name: String,
     range_cleanup: Option<(Range<usize>, usize)>,
     cs: &'static Capstone,
+    arch: Arch,
 }
 
 impl FuncAsm {
@@ -36,10 +37,11 @@ impl FuncAsm {
 
         Self {
             cs,
+            arch: elf.arch(),
             name: function_name,
             string_list: code
                 .iter()
-                .map(|i| Self::inst_to_string(cs, elf, i))
+                .map(|i| Self::inst_to_string(cs, elf, i, elf.arch()))
                 .collect(),
             insn_list: code,
             range_cleanup: None,
@@ -72,19 +74,58 @@ impl FuncAsm {
             match i {
                 InsnGroupId(CALL_INST) => {
                     for op in detail.arch_detail().operands() {
-                        if let arch::ArchOperand::X86Operand(op) = op {
-                            if let arch::x86::X86OperandType::Imm(x) = op.op_type {
-                                return Some(BranchInst::Call(x as u64));
+                        // I wanna generate it using macros one day
+                        match self.arch {
+                            Arch::X86_64 | Arch::X86 => {
+                                if let arch::ArchOperand::X86Operand(op) = op {
+                                    if let arch::x86::X86OperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Call(x as u64));
+                                    }
+                                }
                             }
+                            Arch::Arm => {
+                                if let arch::ArchOperand::ArmOperand(op) = op {
+                                    if let arch::arm::ArmOperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Call(x as u64));
+                                    }
+                                }
+                            }
+                            Arch::Arm64 => {
+                                if let arch::ArchOperand::Arm64Operand(op) = op {
+                                    if let arch::arm64::Arm64OperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Call(x as u64));
+                                    }
+                                }
+                            }
+                            _ => todo!(),
                         }
                     }
                 }
                 InsnGroupId(JUMP_INST) => {
                     for op in detail.arch_detail().operands() {
-                        if let arch::ArchOperand::X86Operand(op) = op {
-                            if let arch::x86::X86OperandType::Imm(x) = op.op_type {
-                                return Some(BranchInst::Jump(x as u64));
+                        match self.arch {
+                            Arch::X86_64 | Arch::X86 => {
+                                if let arch::ArchOperand::X86Operand(op) = op {
+                                    if let arch::x86::X86OperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Jump(x as u64));
+                                    }
+                                }
                             }
+                            Arch::Arm => {
+                                if let arch::ArchOperand::ArmOperand(op) = op {
+                                    if let arch::arm::ArmOperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Jump(x as u64));
+                                    }
+                                }
+                            }
+                            Arch::Arm64 => {
+                                if let arch::ArchOperand::Arm64Operand(op) = op {
+                                    if let arch::arm64::Arm64OperandType::Imm(x) = op.op_type {
+                                        return Some(BranchInst::Jump(x as u64));
+                                    }
+                                }
+                            }
+                            _ => todo!(),
                         }
                     }
                 }
@@ -95,7 +136,7 @@ impl FuncAsm {
         None
     }
 
-    fn inst_to_string(c: &Capstone, elf: &Elf, inst: &Insn) -> Text<'static> {
+    fn inst_to_string(c: &Capstone, elf: &Elf, inst: &Insn, arch: Arch) -> Text<'static> {
         let detail = c.insn_detail(inst);
 
         if let Ok(d) = detail {
@@ -106,16 +147,47 @@ impl FuncAsm {
                 match i {
                     InsnGroupId(CALL_INST) => {
                         for op in d.arch_detail().operands() {
-                            if let arch::ArchOperand::X86Operand(op) = op {
-                                if let arch::x86::X86OperandType::Imm(x) = op.op_type {
-                                    call_name = elf.function_name_by_addr(x as u64);
+                            match arch {
+                                Arch::X86_64 | Arch::X86 => {
+                                    if let arch::ArchOperand::X86Operand(op) = op {
+                                        if let arch::x86::X86OperandType::Imm(x) = op.op_type {
+                                            call_name = elf.function_name_by_addr(x as u64);
 
-                                    log_info!(
-                                        "Found call inst at addr {} to 0x{:x}",
-                                        inst.address(),
-                                        x
-                                    );
+                                            log_info!(
+                                                "Found call inst at addr {} to 0x{:x}",
+                                                inst.address(),
+                                                x
+                                            );
+                                        }
+                                    }
                                 }
+                                Arch::Arm => {
+                                    if let arch::ArchOperand::ArmOperand(op) = op {
+                                        if let arch::arm::ArmOperandType::Imm(x) = op.op_type {
+                                            call_name = elf.function_name_by_addr(x as u64);
+
+                                            log_info!(
+                                                "Found call inst at addr {} to 0x{:x}",
+                                                inst.address(),
+                                                x
+                                            );
+                                        }
+                                    }
+                                }
+                                Arch::Arm64 => {
+                                    if let arch::ArchOperand::Arm64Operand(op) = op {
+                                        if let arch::arm64::Arm64OperandType::Imm(x) = op.op_type {
+                                            call_name = elf.function_name_by_addr(x as u64);
+
+                                            log_info!(
+                                                "Found call inst at addr {} to 0x{:x}",
+                                                inst.address(),
+                                                x
+                                            );
+                                        }
+                                    }
+                                }
+                                _ => todo!(),
                             }
                         }
                     }

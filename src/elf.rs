@@ -13,6 +13,7 @@ pub struct Functions<'a> {
 }
 
 // TODO: extend maybe?
+#[derive(PartialEq, Eq)]
 pub enum Arch {
     X86,
     X86_64,
