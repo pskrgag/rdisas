@@ -174,7 +174,7 @@ impl Elf {
                             && i.st_shndx == j.st_shndx
                             && j.st_value > i.st_value
                         {
-                            if let Some(ref s) = next_sym.as_ref() {
+                            if let Some(s) = next_sym.as_ref() {
                                 if j.st_value < s.st_value {
                                     next_sym = Some(j)
                                 }
@@ -183,7 +183,7 @@ impl Elf {
                             }
                         }
 
-                        if let Some(ref s) = next_sym.as_ref() {
+                        if let Some(s) = next_sym.as_ref() {
                             end = (s.st_value - target_section.sh_addr) as usize;
                         }
                     }

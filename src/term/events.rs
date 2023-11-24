@@ -12,6 +12,8 @@ pub enum KeyboardEvent {
     CmdEnter,
     CmdEnd,
     Delete,
+    Help,
+    HelpEnd,
 }
 
 fn __wait_event() -> Option<KeyEvent> {
@@ -47,6 +49,8 @@ pub fn wait_event(s: &State) -> KeyboardEvent {
                 KeyCode::Char('h') => Some(KeyboardEvent::PrevFrame),
                 KeyCode::Char('l') => Some(KeyboardEvent::Enter), /* vim-like shit */
                 KeyCode::Char('/') => Some(KeyboardEvent::CmdEnter), /* vim-like shit */
+                KeyCode::F(1) => Some(KeyboardEvent::Help),
+                KeyCode::Esc => Some(KeyboardEvent::HelpEnd),
                 _ => None,
             },
         };

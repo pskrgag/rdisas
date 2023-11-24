@@ -32,10 +32,7 @@ pub struct FuncAsm {
 impl FuncAsm {
     pub fn new(function_name: String, elf: &Elf, cs: &'static Capstone) -> Self {
         let (code, addr) = elf.func_code(&function_name);
-        log_info!("Code len {}", code.iter().len());
         let code = cs.disasm_all(code, addr).unwrap();
-
-        log_info!("Code len {}", code.iter().len());
 
         Self {
             cs,

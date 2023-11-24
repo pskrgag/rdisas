@@ -3,7 +3,10 @@ use crate::elf::{Arch, Elf};
 use crate::term::events::KeyboardEvent;
 use crate::term::frames::func_list::*;
 use capstone::prelude::*;
+
+
 use tui::widgets::ListState;
+
 
 use crate::term::frames::*;
 
@@ -27,10 +30,24 @@ pub struct App {
     state: State,
 
     pub cmd: CommandLine,
+    pub help_requested: bool,
 }
 
 // End of frames
 impl App {
+    pub fn help(&self) -> Vec<&'static str> {
+        assert!(self.help_requested);
+
+        vec![
+            "h, j, k       --    back, down, up",
+            "q             --    exit",
+            "F1            --    help",
+            "ESC           --    exit help or exit find",
+            "Enter         --    follow call or jump",
+            "/             --    find",
+        ]
+    }
+
     fn next_state(item: &ItemType, liststate: &mut ListState) {
         let size = item.list_size();
         let selected = liststate.selected().unwrap();
@@ -72,6 +89,8 @@ impl App {
             KeyboardEvent::Exit => return true,
             KeyboardEvent::Key(c) => self.input_char(Some(c)),
             KeyboardEvent::Delete => self.input_char(None),
+            KeyboardEvent::Help => self.help_requested = true,
+            KeyboardEvent::HelpEnd => self.help_requested = false,
             _ => {}
         }
 
@@ -121,6 +140,7 @@ impl App {
             cmd: CommandLine::new(),
             state: State::Control,
             elf,
+            help_requested: false,
         };
 
         s.add_front_frame(ItemType::FunctionList(list));

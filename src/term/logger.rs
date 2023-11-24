@@ -73,7 +73,7 @@ macro_rules! log_info {
     };
     ($fmt:expr) => {
         unsafe {
-            crate::term::logger::LOGGER.push(($fmt).to_string(), crate::term::logger::LogType::Info);
+            $crate::term::logger::LOGGER.push(($fmt).to_string(), $crate::term::logger::LogType::Info);
         }
     }
 }
@@ -87,7 +87,7 @@ macro_rules! log_debug {
     };
     ($fmt:expr) => {
         unsafe {
-            crate::term::logger::LOGGER.push($fmt, crate::term::logger::LogType::Debug);
+            $crate::term::logger::LOGGER.push($fmt, $crate::term::logger::LogType::Debug);
         }
     }
 }
@@ -101,7 +101,7 @@ macro_rules! log_warn {
     };
     ($fmt:expr) => {
         unsafe {
-            crate::term::logger::LOGGER.push(($fmt).to_string(), crate::term::logger::LogType::Warn);
+            $crate::term::logger::LOGGER.push(($fmt).to_string(), $crate::term::logger::LogType::Warn);
         }
     }
 }
