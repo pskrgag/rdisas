@@ -174,7 +174,7 @@ impl FuncAsm {
                             .to_mut()
                             .as_bytes_mut()
                     };
-                    let addr_offset = text.iter().position(|c| *c == b':').unwrap();
+                    let addr_offset = text.iter().position(|c| *c == b' ').unwrap();
 
                     if self.insn_list[idx].address() == addr {
                         for j in addr_offset + 5..text.len() {
@@ -276,7 +276,7 @@ impl ScreenItem for FuncAsm {
         if let Some(inst) = self.is_branch_inst(&self.insn_list.as_ref()[idx]) {
             match inst {
                 BranchInst::Call(addr) => {
-                    let call_name = elf.function_name_by_addr(addr).unwrap();
+                    let call_name = elf.function_name_by_addr(addr)?;
                     Some(ItemType::FunctionDisas(FuncAsm::new(call_name, elf, cs)))
                 }
                 BranchInst::Jump(addr) => {
