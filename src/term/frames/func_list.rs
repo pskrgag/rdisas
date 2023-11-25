@@ -27,7 +27,7 @@ impl FuncList {
         Self {
             ui_list: func_list
                 .iter()
-                .map(|i| ListItem::new(i.1 .0.clone()))
+                .map(|i| ListItem::new(i.1.name().clone()))
                 .collect(),
             func_list: l,
         }
@@ -58,8 +58,7 @@ impl ScreenItem for FuncList {
         state: &mut ListState,
     ) -> Option<ItemType> {
         let new = FuncAsm::new(
-            self.func_list[state.selected().unwrap()].0.clone(),
-            self.func_list[state.selected().unwrap()].1.st_value,
+            self.func_list[state.selected().unwrap()].clone(),
             elf,
             cs,
         );
@@ -73,7 +72,7 @@ impl ScreenItem for FuncList {
         log_info!("Tryng to find {}", s);
 
         for i in state.selected().unwrap()..self.func_list.len() {
-            if self.func_list[i].0.contains(s) {
+            if self.func_list[i].name().contains(s) {
                 state.select(Some(i));
                 break;
             }

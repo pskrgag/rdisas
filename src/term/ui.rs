@@ -15,7 +15,7 @@ pub fn render(app: &mut App, f: &mut Frame) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref());
+        .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref());
     let bottom_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());

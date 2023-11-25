@@ -38,7 +38,7 @@ fn main() {
     }
     .unwrap();
 
-    let mut e = match elf::Elf::new(Box::leak(Box::new(mmap_data))) {
+    let e = match elf::Elf::new(Box::leak(Box::new(mmap_data))) {
         Some(e) => Some(e),
         None => {
             error!("Failed to create elf");

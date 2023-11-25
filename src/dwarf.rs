@@ -1,14 +1,51 @@
+use crate::elf::Function;
 use object::{File, Object, ObjectSection};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{borrow, path};
+use std::path::Path;
 
 pub struct DwarfParser {
     obj: File<'static>,
     lines: HashMap<u64, (PathBuf, usize)>,
 }
 
+pub struct FunctionDebugInfo((PathBuf, Vec<(u64, usize)>));
+
+impl FunctionDebugInfo {
+    pub(crate) fn new(data: (PathBuf, Vec<(u64, usize)>)) -> Self {
+        Self(data)
+    }
+
+    pub fn file_name(&self) -> &PathBuf {
+        &self.0.0
+    }
+
+    pub fn line_range(&self) -> (usize, usize) {
+        let key = |rhs: &&(u64, usize)| {
+           rhs.1
+        };
+
+        let max = self.0.1.iter().max_by_key(key).unwrap().1;
+        let min = self.0.1.iter().min_by_key(key).unwrap().1;
+        (min, max)
+    }
+}
+
 impl DwarfParser {
+    pub fn function_data(&self, f: &Function) -> Option<FunctionDebugInfo> {
+        let pb = self.lines.get(&f.addr())?;
+
+        Some(FunctionDebugInfo::new((
+            pb.0.clone(),
+            self.lines
+                .iter()
+                .filter(|x| *x.0 >= f.addr() && *x.0 <= f.addr() + f.size() as u64)
+                .map(|x| (*x.0, x.1 .1))
+                .collect(),
+        )))
+    }
+
     pub fn new(data: &'static [u8]) -> Option<Self> {
         let obj = File::parse(data).ok()?;
         let mut map = HashMap::new();
@@ -43,10 +80,6 @@ impl DwarfParser {
         let mut iter = dwarf.units();
 
         while let Some(header) = iter.next().ok()? {
-            // println!(
-            //     "Line number info for unit at <.debug_info+0x{:x}>",
-            //     header.offset().as_debug_info_offset().unwrap().0
-            // );
             let unit = dwarf.unit(header).ok()?;
 
             // Get the line program for the compilation unit.

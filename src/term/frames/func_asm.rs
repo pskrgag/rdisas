@@ -1,5 +1,5 @@
 use super::{ItemType, ScreenItem};
-use crate::elf::{Arch, Elf};
+use crate::elf::{Arch, Elf, Function};
 use capstone::arch;
 use capstone::Capstone;
 use capstone::InsnGroupId;
@@ -12,6 +12,9 @@ use tui::{
     text::{Line, Span, Text},
     widgets::{List, ListItem, ListState, Paragraph},
 };
+use std::fs::File;
+use crate::dwarf::FunctionDebugInfo;
+use std::io::{prelude::*, BufReader};
 
 const CALL_INST: u8 = InsnGroupType::CS_GRP_CALL as u8;
 const JUMP_INST: u8 = InsnGroupType::CS_GRP_JUMP as u8;
@@ -28,24 +31,53 @@ pub struct FuncAsm {
     range_cleanup: Option<(Range<usize>, usize)>,
     cs: &'static Capstone,
     arch: Arch,
+    debug_info: Option<Paragraph<'static>>,
 }
 
 impl FuncAsm {
-    pub fn new(function_name: String, addr: u64, elf: &Elf, cs: &'static Capstone) -> Self {
-        let (code, addr) = elf.func_code(addr);
+    pub fn new(f: Function, elf: &Elf, cs: &'static Capstone) -> Self {
+        let (code, addr) = elf.func_code(f.addr());
+        log_info!("Code size {}", code.len());
         let code = cs.disasm_all(code, addr).unwrap();
 
         Self {
             cs,
             arch: elf.arch(),
-            name: function_name,
+            name: (*f.name()).clone(),
             string_list: code
                 .iter()
                 .map(|i| Self::inst_to_string(cs, elf, i, elf.arch()))
                 .collect(),
             insn_list: code,
             range_cleanup: None,
+            debug_info: Self::debug_frame(elf.function_debug_info(f)),
         }
+    }
+
+    fn debug_frame(d: Option<FunctionDebugInfo>) -> Option<Paragraph<'static>> {
+        let di = d?;
+        let mut v = Vec::new();
+
+        log_info!("Hello");
+
+        if let Some(file) = File::open(di.file_name()).ok() {
+            let (start, end) = di.line_range();
+            let reader = BufReader::new(file);
+            let mut size = end - start;
+
+            log_info!("{} {}", start, end);
+            for line in reader.lines().skip(start - 1) {
+                v.push(Line::from(line.ok()?));
+
+                size -= 0;
+                if size == 0 {
+                    break;
+                }
+            }
+
+        }
+
+        Some(Paragraph::new(Text::from(v)))
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
@@ -151,7 +183,7 @@ impl FuncAsm {
                                 Arch::X86_64 | Arch::X86 => {
                                     if let arch::ArchOperand::X86Operand(op) = op {
                                         if let arch::x86::X86OperandType::Imm(x) = op.op_type {
-                                            call_name = elf.function_name_by_addr(x as u64);
+                                            call_name = elf.function_by_addr(x as u64);
 
                                             log_info!(
                                                 "Found call inst at addr {} to 0x{:x}",
@@ -164,7 +196,7 @@ impl FuncAsm {
                                 Arch::Arm => {
                                     if let arch::ArchOperand::ArmOperand(op) = op {
                                         if let arch::arm::ArmOperandType::Imm(x) = op.op_type {
-                                            call_name = elf.function_name_by_addr(x as u64);
+                                            call_name = elf.function_by_addr(x as u64);
 
                                             log_info!(
                                                 "Found call inst at addr {} to 0x{:x}",
@@ -177,7 +209,7 @@ impl FuncAsm {
                                 Arch::Arm64 => {
                                     if let arch::ArchOperand::Arm64Operand(op) = op {
                                         if let arch::arm64::Arm64OperandType::Imm(x) = op.op_type {
-                                            call_name = elf.function_name_by_addr(x as u64);
+                                            call_name = elf.function_by_addr(x as u64);
 
                                             log_info!(
                                                 "Found call inst at addr {} to 0x{:x}",
@@ -201,7 +233,7 @@ impl FuncAsm {
             if let Some(call) = call_name {
                 let mut text = Self::format_insn(inst);
 
-                text.push(Span::from(format!("      <{}>", call)));
+                text.push(Span::from(format!("      <{}>", call.name())));
                 Text::from(Line::from(text))
             } else {
                 Text::from(Line::from(Self::format_insn(inst)))
@@ -337,7 +369,7 @@ impl ScreenItem for FuncAsm {
     }
 
     fn second_frame(&self) -> Option<Paragraph> {
-        Some(Paragraph::new(Text::from("Hello")))
+        self.debug_info.clone()
     }
 
     fn go_in(
@@ -352,8 +384,8 @@ impl ScreenItem for FuncAsm {
         if let Some(inst) = self.is_branch_inst(&self.insn_list.as_ref()[idx]) {
             match inst {
                 BranchInst::Call(addr) => {
-                    let call_name = elf.function_name_by_addr(addr)?;
-                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, addr, elf, cs)))
+                    let call_name = elf.function_by_addr(addr)?;
+                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, elf, cs)))
                 }
                 BranchInst::Jump(addr) => {
                     let self_addr = self.insn_list[idx].address();

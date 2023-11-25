@@ -1,7 +1,6 @@
 use crate::elf::Elf;
 use capstone::Capstone;
 use tui::widgets::{List, ListState, Paragraph};
-use tui::widgets::Widget;
 
 pub mod func_asm;
 pub mod func_list;
