@@ -10,7 +10,7 @@ use std::ops::Range;
 use tui::{
     style::{Color, Style},
     text::{Line, Span, Text},
-    widgets::{List, ListItem, ListState},
+    widgets::{List, ListItem, ListState, Paragraph},
 };
 
 const CALL_INST: u8 = InsnGroupType::CS_GRP_CALL as u8;
@@ -192,7 +192,7 @@ impl FuncAsm {
                         }
                     }
                     InsnGroupId(JUMP_INST) => {
-                        log_info!("Found jump inst at addr {:x}", inst.address());
+                        // log_info!("Found jump inst at addr {:x}", inst.address());
                     }
                     _ => {}
                 }
@@ -336,6 +336,10 @@ impl ScreenItem for FuncAsm {
         self.draw_jump(state);
     }
 
+    fn second_frame(&self) -> Option<Paragraph> {
+        Some(Paragraph::new(Text::from("Hello")))
+    }
+
     fn go_in(
         &mut self,
         elf: &Elf,
@@ -354,7 +358,7 @@ impl ScreenItem for FuncAsm {
                 BranchInst::Jump(addr) => {
                     let self_addr = self.insn_list[idx].address();
 
-                    log_info!("Trying to find {:x}", addr);
+                    // log_info!("Trying to find {:x}", addr);
 
                     if addr < self_addr {
                         for i in (idx..=0).rev() {

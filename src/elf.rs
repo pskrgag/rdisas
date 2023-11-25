@@ -3,14 +3,11 @@ use elf::section::{SectionHeader, SectionHeaderTable};
 use elf::symbol::Symbol;
 use elf::ElfBytes;
 use std::collections::HashMap;
+use crate::dwarf::DwarfParser;
 
 // Name and section index
 type Function = (String, u64);
 type FunctionMap = HashMap<u64, Function>;
-
-pub struct Functions<'a> {
-    list: Vec<(&'a str, Symbol)>,
-}
 
 // TODO: extend maybe?
 #[derive(PartialEq, Eq)]
@@ -23,28 +20,18 @@ pub enum Arch {
     Mips,
 }
 
-impl<'a> Functions<'a> {
-    pub fn new(list: Vec<(&'a str, Symbol)>) -> Self {
-        Self { list }
-    }
-
-    // refs didn't work.... I am too dumb at rust
-    pub fn names(&self) -> Vec<String> {
-        self.list.iter().map(|x| x.0.to_owned()).collect()
-    }
-}
-
 pub struct Elf {
     data: ElfBytes<'static, AnyEndian>,
     sections: Option<SectionHeaderTable<'static, AnyEndian>>,
     functions: FunctionMap,
+    debug_info: DwarfParser,
 }
 
 impl Elf {
-    pub fn new(data: &'static [u8]) -> Option<Self> {
+    pub fn new(raw_data: &'static [u8]) -> Option<Self> {
         const ELF_SYM_STT_FUNC: u8 = 2;
 
-        let data = match ElfBytes::<AnyEndian>::minimal_parse(data) {
+        let data = match ElfBytes::<AnyEndian>::minimal_parse(raw_data) {
             Ok(o) => Some(o),
             Err(e) => {
                 error!("Failed to parse file {}", e);
@@ -73,6 +60,7 @@ impl Elf {
                 .collect(),
             data,
             sections: None,
+            debug_info: DwarfParser::new(raw_data)?,
         })
     }
 
@@ -84,7 +72,7 @@ impl Elf {
             0x28 => Arch::Arm,
             0xF3 => Arch::Riscv,
             0x08 => Arch::Mips,
-            _ => panic!("Idk"),
+            _ => panic!("How did I end up here?"),
         }
     }
 
@@ -97,21 +85,8 @@ impl Elf {
         Some(self.functions.get(&addr)?.0.clone())
     }
 
-    pub fn function_names(&self) -> Option<Functions> {
-        const ELF_SYM_STT_FUNC: u8 = 2;
-
-        // TODO: optimize that shit!!!!!
-        if let Ok(Some((symtab, strtab))) = self.data.symbol_table() {
-            Some(Functions::new(
-                symtab
-                    .iter()
-                    .map(|sym| (strtab.get(sym.st_name as usize).unwrap_or("unknown"), sym))
-                    .filter(|s| s.1.st_symtype() == ELF_SYM_STT_FUNC)
-                    .collect::<Vec<(&str, Symbol)>>(),
-            ))
-        } else {
-            None
-        }
+    pub fn function_names(&self) -> Vec<String> {
+        self.functions.iter().map(|x| x.1.0.clone()).collect()
     }
 
     pub fn func_code(&self, name: &String) -> (&[u8], u64) {
@@ -145,7 +120,7 @@ impl Elf {
             }
         }
 
-        todo!();
+        panic!("Something gone wrong....");
     }
 
     fn func_code_exe(&self, name: &String) -> (&[u8], u64) {
@@ -189,8 +164,6 @@ impl Elf {
                         }
                     }
                 }
-
-                crate::log_info!("Found {} at addr {}", name, i.st_value);
 
                 if start != end {
                     return (

@@ -1,6 +1,7 @@
 use crate::elf::Elf;
 use capstone::Capstone;
-use tui::widgets::{List, ListState};
+use tui::widgets::{List, ListState, Paragraph};
+use tui::widgets::Widget;
 
 pub mod func_asm;
 pub mod func_list;
@@ -60,6 +61,13 @@ impl ScreenItem for ItemType {
             Self::FunctionDisas(s) => s.title(),
         }
     }
+
+    fn second_frame(&self) -> Option<Paragraph> {
+        match self {
+            Self::FunctionList(s) => s.second_frame(),
+            Self::FunctionDisas(s) => s.second_frame(),
+        }
+    }
 }
 
 pub trait ScreenItem {
@@ -72,6 +80,10 @@ pub trait ScreenItem {
         cs: &'static Capstone,
         state: &mut ListState,
     ) -> Option<ItemType>;
+
+    fn second_frame(&self) -> Option<Paragraph> {
+        None
+    }
 
     fn cursor_move(&mut self, _state: &ListState) {}
 

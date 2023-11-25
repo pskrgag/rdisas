@@ -4,6 +4,7 @@ use std::env;
 mod app;
 mod elf;
 mod term;
+mod dwarf;
 
 #[macro_use]
 extern crate log;

@@ -107,8 +107,8 @@ impl App {
     }
 
     pub fn new(elf: Elf) -> Option<Self> {
-        let funcs = elf.function_names()?;
-        let list = FuncList::new(funcs.names());
+        let funcs = elf.function_names();
+        let list = FuncList::new(funcs);
 
         let cs = match elf.arch() {
             Arch::X86 => Capstone::new()
