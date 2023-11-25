@@ -1,12 +1,12 @@
+use crate::dwarf::DwarfParser;
 use elf::endian::AnyEndian;
 use elf::section::{SectionHeader, SectionHeaderTable};
 use elf::symbol::Symbol;
 use elf::ElfBytes;
 use std::collections::HashMap;
-use crate::dwarf::DwarfParser;
 
 // Name and section index
-type Function = (String, u64);
+pub type Function = (String, Symbol);
 type FunctionMap = HashMap<u64, Function>;
 
 // TODO: extend maybe?
@@ -22,9 +22,9 @@ pub enum Arch {
 
 pub struct Elf {
     data: ElfBytes<'static, AnyEndian>,
-    sections: Option<SectionHeaderTable<'static, AnyEndian>>,
+    sections: SectionHeaderTable<'static, AnyEndian>,
     functions: FunctionMap,
-    debug_info: DwarfParser,
+    debug_info: Option<DwarfParser>,
 }
 
 impl Elf {
@@ -41,6 +41,32 @@ impl Elf {
 
         let (symtab, strtab) = data.symbol_table().ok()??;
 
+        // If compiler does not set size for function, simply look up next label
+        // in the same section
+        let proccess_st_size = |mut sym: Symbol| {
+            let mut next_sym: Option<Symbol> = None;
+
+            for j in symtab.iter() {
+                if j.st_symtype() == ELF_SYM_STT_FUNC
+                    && sym.st_shndx == sym.st_shndx
+                    && j.st_value > sym.st_value
+                {
+                    if let Some(s) = next_sym.as_ref() {
+                        if j.st_value < s.st_value {
+                            next_sym = Some(j)
+                        }
+                    } else {
+                        next_sym = Some(j);
+                    }
+                }
+
+                if let Some(s) = next_sym.as_ref() {
+                    sym.st_size = s.st_value - sym.st_value;
+                }
+            }
+            sym
+        };
+
         Some(Self {
             functions: symtab
                 .iter()
@@ -53,14 +79,14 @@ impl Elf {
                                 .get(sym.st_name as usize)
                                 .unwrap_or("unknown")
                                 .to_owned(),
-                            sym.st_shndx as u64,
+                            proccess_st_size(sym),
                         ),
                     )
                 })
                 .collect(),
+            sections: data.section_headers()?,
             data,
-            sections: None,
-            debug_info: DwarfParser::new(raw_data)?,
+            debug_info: DwarfParser::new(raw_data),
         })
     }
 
@@ -76,110 +102,56 @@ impl Elf {
         }
     }
 
-    pub fn load_sections(&mut self) -> Option<()> {
-        self.sections = Some(self.data.section_headers()?);
-        Some(())
-    }
-
     pub fn function_name_by_addr(&self, addr: u64) -> Option<String> {
         Some(self.functions.get(&addr)?.0.clone())
     }
 
-    pub fn function_names(&self) -> Vec<String> {
-        self.functions.iter().map(|x| x.1.0.clone()).collect()
+    pub fn function_names(&self) -> Vec<Function> {
+        self.functions.iter().map(|x| x.1.clone()).collect()
     }
 
-    pub fn func_code(&self, name: &String) -> (&[u8], u64) {
+    pub fn func_code(&self, addr: u64) -> (&[u8], u64) {
         match self.data.ehdr.e_type {
-            elf::abi::ET_REL => self.func_code_reloc(name),
-            elf::abi::ET_DYN | elf::abi::ET_EXEC => self.func_code_exe(name),
+            elf::abi::ET_REL => self.func_code_reloc(addr),
+            elf::abi::ET_DYN | elf::abi::ET_EXEC => self.func_code_exe(addr),
             _ => unreachable!(),
         }
     }
 
-    fn func_code_reloc(&self, name: &String) -> (&[u8], u64) {
-        const ELF_SYM_STT_FUNC: u8 = 2;
+    fn func_code_reloc(&self, addr: u64) -> (&[u8], u64) {
+        let func = self.functions.get(&addr).unwrap();
 
-        let (symtab, strtab) = self
-            .data
-            .symbol_table()
-            .expect("Failed to get symbol table")
-            .unwrap();
-
-        for i in symtab {
-            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name
-            {
-                return (
+        return (
+            &self
+                .data
+                .section_data(
                     &self
-                        .data
-                        .section_data(&self.sections.unwrap().get(i.st_shndx as usize).unwrap())
-                        .unwrap()
-                        .0[i.st_value as usize..i.st_size as usize],
-                    i.st_value,
-                );
-            }
-        }
-
-        panic!("Something gone wrong....");
+                        .sections
+                        .get(func.1.st_shndx as usize)
+                        .unwrap(),
+                )
+                .unwrap()
+                .0[func.1.st_value as usize..func.1.st_size as usize],
+            func.1.st_value,
+        );
     }
 
-    fn func_code_exe(&self, name: &String) -> (&[u8], u64) {
-        const ELF_SYM_STT_FUNC: u8 = 2;
+    fn func_code_exe(&self, addr: u64) -> (&[u8], u64) {
+        let func = self.functions.get(&addr).unwrap();
+        let sym = &func.1;
+        let target_section = &self.sections.get(sym.st_shndx as usize).unwrap();
 
-        let (symtab, strtab) = self
-            .data
-            .symbol_table()
-            .expect("Failed to get symbol table")
-            .unwrap();
+        let start = (sym.st_value - target_section.sh_addr) as usize;
+        let end = start + sym.st_size as usize;
 
-        for i in symtab.iter() {
-            if i.st_symtype() == ELF_SYM_STT_FUNC && strtab.get(i.st_name as usize).unwrap() == name
-            {
-                let target_section = &self.sections.unwrap().get(i.st_shndx as usize).unwrap();
-
-                let start = (i.st_value - target_section.sh_addr) as usize;
-                let mut end = start + i.st_size as usize;
-
-                // If compiler does not set size for function, simply look up next label
-                // in the same section
-                if start == end {
-                    let mut next_sym: Option<Symbol> = None;
-
-                    for j in symtab {
-                        if j.st_symtype() == ELF_SYM_STT_FUNC
-                            && i.st_shndx == j.st_shndx
-                            && j.st_value > i.st_value
-                        {
-                            if let Some(s) = next_sym.as_ref() {
-                                if j.st_value < s.st_value {
-                                    next_sym = Some(j)
-                                }
-                            } else {
-                                next_sym = Some(j);
-                            }
-                        }
-
-                        if let Some(s) = next_sym.as_ref() {
-                            end = (s.st_value - target_section.sh_addr) as usize;
-                        }
-                    }
-                }
-
-                if start != end {
-                    return (
-                        &self.data.section_data(target_section).unwrap().0[start..end],
-                        i.st_value,
-                    );
-                } else {
-                    return (
-                        &self.data.section_data(target_section).unwrap().0[start..],
-                        i.st_value,
-                    );
-                }
-            }
+        let section_data = &self.data.section_data(target_section).unwrap().0;
+        if end >= section_data.len() {
+            (&section_data[0..0], sym.st_value)
+        } else if start != end {
+            (&section_data[start..end], sym.st_value)
+        } else {
+            (&section_data[start..], sym.st_value)
         }
-
-        todo!()
     }
 
     #[cfg(debug_assertions)]

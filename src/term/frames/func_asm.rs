@@ -31,8 +31,8 @@ pub struct FuncAsm {
 }
 
 impl FuncAsm {
-    pub fn new(function_name: String, elf: &Elf, cs: &'static Capstone) -> Self {
-        let (code, addr) = elf.func_code(&function_name);
+    pub fn new(function_name: String, addr: u64, elf: &Elf, cs: &'static Capstone) -> Self {
+        let (code, addr) = elf.func_code(addr);
         let code = cs.disasm_all(code, addr).unwrap();
 
         Self {
@@ -353,7 +353,7 @@ impl ScreenItem for FuncAsm {
             match inst {
                 BranchInst::Call(addr) => {
                     let call_name = elf.function_name_by_addr(addr)?;
-                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, elf, cs)))
+                    Some(ItemType::FunctionDisas(FuncAsm::new(call_name, addr, elf, cs)))
                 }
                 BranchInst::Jump(addr) => {
                     let self_addr = self.insn_list[idx].address();

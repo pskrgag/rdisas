@@ -47,8 +47,6 @@ fn main() {
     }
     .unwrap();
 
-    e.load_sections();
-
     let mut app = app::App::new(e).unwrap();
     let mut tui = term::tui::Tui::new().unwrap();
 

@@ -1,6 +1,6 @@
 use super::func_asm::FuncAsm;
 use super::{ItemType, ScreenItem};
-use crate::elf::Elf;
+use crate::elf::{Elf, Function};
 use capstone::Capstone;
 use tui::{
     style::{Color, Style},
@@ -8,15 +8,15 @@ use tui::{
 };
 
 pub struct FuncList {
-    func_list: Vec<(usize, String)>, // Should be smth better for prefix finding
+    func_list: Vec<Function>, // Should be smth better for prefix finding
     ui_list: Vec<ListItem<'static>>,
 }
 
 impl FuncList {
-    pub fn new(l: Vec<String>) -> Self {
+    pub fn new(l: Vec<Function>) -> Self {
         let mut cnt = 0;
         let func_list: Vec<_> = l
-            .into_iter()
+            .iter()
             .map(|x| {
                 let new = (cnt, x);
                 cnt += 1;
@@ -27,9 +27,9 @@ impl FuncList {
         Self {
             ui_list: func_list
                 .iter()
-                .map(|i| ListItem::new(i.1.clone()))
+                .map(|i| ListItem::new(i.1 .0.clone()))
                 .collect(),
-            func_list,
+            func_list: l,
         }
     }
 }
@@ -57,7 +57,12 @@ impl ScreenItem for FuncList {
         cs: &'static Capstone,
         state: &mut ListState,
     ) -> Option<ItemType> {
-        let new = FuncAsm::new(self.func_list[state.selected().unwrap()].1.clone(), elf, cs);
+        let new = FuncAsm::new(
+            self.func_list[state.selected().unwrap()].0.clone(),
+            self.func_list[state.selected().unwrap()].1.st_value,
+            elf,
+            cs,
+        );
 
         Some(ItemType::FunctionDisas(new))
     }
@@ -68,7 +73,7 @@ impl ScreenItem for FuncList {
         log_info!("Tryng to find {}", s);
 
         for i in state.selected().unwrap()..self.func_list.len() {
-            if self.func_list[i].1.contains(s) {
+            if self.func_list[i].0.contains(s) {
                 state.select(Some(i));
                 break;
             }

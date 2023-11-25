@@ -43,10 +43,10 @@ impl DwarfParser {
         let mut iter = dwarf.units();
 
         while let Some(header) = iter.next().ok()? {
-            println!(
-                "Line number info for unit at <.debug_info+0x{:x}>",
-                header.offset().as_debug_info_offset().unwrap().0
-            );
+            // println!(
+            //     "Line number info for unit at <.debug_info+0x{:x}>",
+            //     header.offset().as_debug_info_offset().unwrap().0
+            // );
             let unit = dwarf.unit(header).ok()?;
 
             // Get the line program for the compilation unit.
