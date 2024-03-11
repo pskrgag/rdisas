@@ -1,4 +1,5 @@
 use super::{ItemType, ScreenItem};
+use crate::dwarf::FunctionDebugInfo;
 use crate::elf::{Arch, Elf, Function};
 use capstone::arch;
 use capstone::Capstone;
@@ -6,22 +7,36 @@ use capstone::InsnGroupId;
 use capstone::InsnGroupType;
 use capstone::{Insn, Instructions};
 use itertools::Either;
+use std::fs::File;
+use std::io::{prelude::*, BufReader};
 use std::ops::Range;
 use tui::{
     style::{Color, Style},
     text::{Line, Span, Text},
     widgets::{List, ListItem, ListState, Paragraph},
 };
-use std::fs::File;
-use crate::dwarf::FunctionDebugInfo;
-use std::io::{prelude::*, BufReader};
 
 const CALL_INST: u8 = InsnGroupType::CS_GRP_CALL as u8;
 const JUMP_INST: u8 = InsnGroupType::CS_GRP_JUMP as u8;
 
+const COLORS: usize = 4;
+const BASE: u8 = 60;
+const SKIP: u8 = 10;
+
 enum BranchInst {
     Call(u64),
     Jump(u64),
+}
+
+lazy_static::lazy_static! {
+    static ref STYLE_ARRAY: [Style; COLORS] = [
+        Style::default().bg(Color::Rgb(BASE, BASE, BASE)),
+        Style::default().bg(Color::Rgb(BASE - SKIP * 1, BASE - SKIP * 1, BASE - SKIP * 1)),
+        Style::default().bg(Color::Rgb(BASE - SKIP * 2, BASE - SKIP * 2, BASE - SKIP * 2)),
+        Style::default().bg(Color::Rgb(BASE - SKIP * 3, BASE - SKIP * 3 , BASE - SKIP * 3)),
+    ];
+
+    static ref STYLE_SELECTED: Style = Style::default().bg(Color::Blue);
 }
 
 pub struct FuncAsm {
@@ -31,14 +46,17 @@ pub struct FuncAsm {
     range_cleanup: Option<(Range<usize>, usize)>,
     cs: &'static Capstone,
     arch: Arch,
-    debug_info: Option<Paragraph<'static>>,
+    debug_info: Option<(Vec<Line<'static>>, usize)>,
+    elf_debug_info: Option<FunctionDebugInfo>,
+    marked: (Vec<usize>, Vec<usize>),
 }
 
 impl FuncAsm {
     pub fn new(f: Function, elf: &Elf, cs: &'static Capstone) -> Self {
         let (code, addr) = elf.func_code(f.addr());
-        log_info!("Code size {}", code.len());
         let code = cs.disasm_all(code, addr).unwrap();
+        let elf_debug_info = elf.function_debug_info(&f);
+        let debug_info = Self::debug_frame(&elf_debug_info);
 
         Self {
             cs,
@@ -46,38 +64,47 @@ impl FuncAsm {
             name: (*f.name()).clone(),
             string_list: code
                 .iter()
-                .map(|i| Self::inst_to_string(cs, elf, i, elf.arch()))
+                .map(|i| {
+                    Self::inst_to_string(
+                        cs,
+                        elf,
+                        i,
+                        elf.arch(),
+                    )
+                })
                 .collect(),
             insn_list: code,
             range_cleanup: None,
-            debug_info: Self::debug_frame(elf.function_debug_info(f)),
+            debug_info,
+            elf_debug_info,
+            marked: (Vec::new(), Vec::new()),
         }
     }
 
-    fn debug_frame(d: Option<FunctionDebugInfo>) -> Option<Paragraph<'static>> {
-        let di = d?;
+    fn debug_frame(d: &Option<FunctionDebugInfo>) -> Option<(Vec<Line<'static>>, usize)> {
+        let di = d.as_ref()?;
         let mut v = Vec::new();
-
-        log_info!("Hello");
+        let (start, end) = di.line_range();
 
         if let Some(file) = File::open(di.file_name()).ok() {
-            let (start, end) = di.line_range();
             let reader = BufReader::new(file);
             let mut size = end - start;
 
-            log_info!("{} {}", start, end);
-            for line in reader.lines().skip(start - 1) {
-                v.push(Line::from(line.ok()?));
+            // FIXME: Any idea how to get slice out of Lines?
+            for line in reader.lines().skip(start) {
+                let l = Line::from(line.ok()?);
 
-                size -= 0;
+                // l.patch_style(STYLE_ARRAY[i % COLORS]);
+                v.push(l);
+
+                size -= 1;
                 if size == 0 {
                     break;
                 }
             }
-
         }
 
-        Some(Paragraph::new(Text::from(v)))
+        Some((v, start))
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
@@ -168,10 +195,14 @@ impl FuncAsm {
         None
     }
 
-    fn inst_to_string(c: &Capstone, elf: &Elf, inst: &Insn, arch: Arch) -> Text<'static> {
+    fn inst_to_string(
+        c: &Capstone,
+        elf: &Elf,
+        inst: &Insn,
+        arch: Arch,
+    ) -> Text<'static> {
         let detail = c.insn_detail(inst);
-
-        if let Ok(d) = detail {
+        let line = if let Ok(d) = detail {
             let group = d.groups();
             let mut call_name = None;
 
@@ -184,12 +215,6 @@ impl FuncAsm {
                                     if let arch::ArchOperand::X86Operand(op) = op {
                                         if let arch::x86::X86OperandType::Imm(x) = op.op_type {
                                             call_name = elf.function_by_addr(x as u64);
-
-                                            log_info!(
-                                                "Found call inst at addr {} to 0x{:x}",
-                                                inst.address(),
-                                                x
-                                            );
                                         }
                                     }
                                 }
@@ -197,12 +222,6 @@ impl FuncAsm {
                                     if let arch::ArchOperand::ArmOperand(op) = op {
                                         if let arch::arm::ArmOperandType::Imm(x) = op.op_type {
                                             call_name = elf.function_by_addr(x as u64);
-
-                                            log_info!(
-                                                "Found call inst at addr {} to 0x{:x}",
-                                                inst.address(),
-                                                x
-                                            );
                                         }
                                     }
                                 }
@@ -210,12 +229,6 @@ impl FuncAsm {
                                     if let arch::ArchOperand::Arm64Operand(op) = op {
                                         if let arch::arm64::Arm64OperandType::Imm(x) = op.op_type {
                                             call_name = elf.function_by_addr(x as u64);
-
-                                            log_info!(
-                                                "Found call inst at addr {} to 0x{:x}",
-                                                inst.address(),
-                                                x
-                                            );
                                         }
                                     }
                                 }
@@ -234,13 +247,15 @@ impl FuncAsm {
                 let mut text = Self::format_insn(inst);
 
                 text.push(Span::from(format!("      <{}>", call.name())));
-                Text::from(Line::from(text))
+                Line::from(text)
             } else {
-                Text::from(Line::from(Self::format_insn(inst)))
+                Line::from(Self::format_insn(inst))
             }
         } else {
-            Text::from(Line::from(Self::format_insn(inst)))
-        }
+            Line::from(Self::format_insn(inst))
+        };
+
+        Text::from(line)
     }
 
     fn cleanup_jump(&mut self) {
@@ -338,6 +353,49 @@ impl FuncAsm {
             }
         }
     }
+
+    fn clean_debug(&mut self) {
+        if let Some(d) = &mut self.debug_info {
+            for debug in &self.marked.0 {
+                d.0[*debug].patch_style(Style::default().bg(Color::Reset));
+            }
+
+            self.marked.0.clear();
+
+            for inst in &self.marked.1 {
+                self.string_list[*inst].patch_style(Style::default().bg(Color::Reset));
+            }
+
+            self.marked.1.clear();
+        }
+    }
+
+    fn color_debug(&mut self, state: &ListState) -> Option<()> {
+        let di = self.elf_debug_info.as_ref()?;
+        let addr = self.insn_list[state.selected().unwrap()].address();
+
+        let line_orig = di.line_by_addr(addr)?;
+        let line = line_orig - self.debug_info.as_ref()?.1;
+
+        if let Some(d) = &mut self.debug_info {
+            if d.0.len() > line {
+                d.0[line].patch_style(STYLE_ARRAY[0]);
+                self.marked.0.push(line);
+            }
+
+            let addr = di.line_to_addrs(*line_orig);
+            for i in addr.unwrap() {
+                for (cnt, j) in &mut self.insn_list.iter().enumerate() {
+                    if j.address() == *i {
+                        self.string_list[cnt].patch_style(STYLE_ARRAY[0]);
+                        self.marked.1.push(cnt);
+                    }
+                }
+            }
+        }
+
+        Some(())
+    }
 }
 
 impl ScreenItem for FuncAsm {
@@ -364,12 +422,14 @@ impl ScreenItem for FuncAsm {
     }
 
     fn cursor_move(&mut self, state: &ListState) {
+        self.clean_debug();
+        self.color_debug(state);
         self.cleanup_jump();
         self.draw_jump(state);
     }
 
     fn second_frame(&self) -> Option<Paragraph> {
-        self.debug_info.clone()
+        Some(Paragraph::new(self.debug_info.as_ref()?.0.clone()))
     }
 
     fn go_in(
@@ -389,8 +449,6 @@ impl ScreenItem for FuncAsm {
                 }
                 BranchInst::Jump(addr) => {
                     let self_addr = self.insn_list[idx].address();
-
-                    // log_info!("Trying to find {:x}", addr);
 
                     if addr < self_addr {
                         for i in (idx..=0).rev() {

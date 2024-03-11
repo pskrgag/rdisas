@@ -3,31 +3,49 @@ use object::{File, Object, ObjectSection};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{borrow, path};
-use std::path::Path;
 
 pub struct DwarfParser {
     obj: File<'static>,
     lines: HashMap<u64, (PathBuf, usize)>,
+    line_to_addr:  HashMap<usize, Vec<u64>>,
 }
 
-pub struct FunctionDebugInfo((PathBuf, Vec<(u64, usize)>));
+pub struct FunctionDebugInfo {
+    path: PathBuf,
+    addr_to_line: HashMap<u64, usize>,       // addr -> line
+    line_to_addrs: HashMap<usize, Vec<u64>>, // addr -> line
+}
 
 impl FunctionDebugInfo {
-    pub(crate) fn new(data: (PathBuf, Vec<(u64, usize)>)) -> Self {
-        Self(data)
+    pub(crate) fn new(data: (PathBuf, HashMap<u64, usize>, HashMap<usize, Vec<u64>>)) -> Self {
+        Self {
+            path: data.0,
+            addr_to_line: data.1,
+            line_to_addrs: data.2,
+        }
+    }
+
+    pub fn line_to_addrs(&self, line: usize) -> Option<&Vec<u64>> {
+        self.line_to_addrs.get(&line)
+    }
+
+    pub fn line_by_addr(&self, addr: u64) -> Option<&usize> {
+        self.addr_to_line.get(&addr)
     }
 
     pub fn file_name(&self) -> &PathBuf {
-        &self.0.0
+        &self.path
     }
 
     pub fn line_range(&self) -> (usize, usize) {
-        let key = |rhs: &&(u64, usize)| {
-           rhs.1
-        };
+        let mut min: usize = usize::MAX;
+        let mut max: usize = 0;
 
-        let max = self.0.1.iter().max_by_key(key).unwrap().1;
-        let min = self.0.1.iter().min_by_key(key).unwrap().1;
+        for i in self.addr_to_line.iter() {
+            min = usize::min(min, *i.1);
+            max = usize::max(max, *i.1);
+        }
+
         (min, max)
     }
 }
@@ -36,19 +54,24 @@ impl DwarfParser {
     pub fn function_data(&self, f: &Function) -> Option<FunctionDebugInfo> {
         let pb = self.lines.get(&f.addr())?;
 
+        let addr_to_line: HashMap<_, _> = self
+            .lines
+            .iter()
+            .filter(|x| *x.0 >= f.addr() && *x.0 <= f.addr() + f.size() as u64)
+            .map(|x| (*x.0, x.1 .1))
+            .collect();
+
         Some(FunctionDebugInfo::new((
             pb.0.clone(),
-            self.lines
-                .iter()
-                .filter(|x| *x.0 >= f.addr() && *x.0 <= f.addr() + f.size() as u64)
-                .map(|x| (*x.0, x.1 .1))
-                .collect(),
+            addr_to_line,
+            self.line_to_addr.clone(),
         )))
     }
 
     pub fn new(data: &'static [u8]) -> Option<Self> {
         let obj = File::parse(data).ok()?;
-        let mut map = HashMap::new();
+        let mut addr_to_line = HashMap::new();
+        let mut line_to_addr: HashMap<usize, Vec<u64>> = HashMap::new();
 
         let load_section = |id: gimli::SectionId| -> Result<borrow::Cow<[u8]>, gimli::Error> {
             match obj.section_by_name(id.name()) {
@@ -128,12 +151,22 @@ impl DwarfParser {
                             None => 0,
                         };
 
-                        map.insert(row.address(), (path, line as usize));
+                        addr_to_line.insert(row.address(), (path, line as usize));
+
+                        if let Some(addrs) = line_to_addr.get_mut(&(line as usize)) {
+                            addrs.push(row.address() as u64);
+                        } else {
+                            line_to_addr.insert(line as usize, vec![row.address() as u64]);
+                        }
                     }
                 }
             }
         }
 
-        Some(Self { obj, lines: map })
+        Some(Self {
+            obj,
+            lines: addr_to_line,
+            line_to_addr,
+        })
     }
 }

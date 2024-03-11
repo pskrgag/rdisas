@@ -175,7 +175,7 @@ impl Elf {
         }
     }
 
-    pub fn function_debug_info(&self, f: Function) -> Option<FunctionDebugInfo> {
+    pub fn function_debug_info(&self, f: &Function) -> Option<FunctionDebugInfo> {
         let dw = self.debug_info.as_ref()?;
 
         dw.function_data(&f)

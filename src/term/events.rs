@@ -16,7 +16,7 @@ pub enum KeyboardEvent {
     HelpEnd,
 }
 
-fn __wait_event() -> Option<KeyEvent> {
+fn do_wait_event() -> Option<KeyEvent> {
     loop {
         match read().ok()? {
             Event::Key(event) => return Some(event),
@@ -29,7 +29,7 @@ pub fn wait_event(s: &State) -> KeyboardEvent {
     let mut res;
 
     while {
-        let key = __wait_event().unwrap();
+        let key = do_wait_event().unwrap();
 
         res = match s {
             State::Insert => match key.code {

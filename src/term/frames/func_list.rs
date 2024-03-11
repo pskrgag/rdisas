@@ -69,7 +69,7 @@ impl ScreenItem for FuncList {
     fn find(&mut self, state: &mut ListState, s: &str) {
         // use fuzzy_match::fuzzy_match;
 
-        log_info!("Tryng to find {}", s);
+        // log_info!("Tryng to find {}", s);
 
         for i in state.selected().unwrap()..self.func_list.len() {
             if self.func_list[i].name().contains(s) {
