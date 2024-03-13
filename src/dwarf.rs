@@ -1,23 +1,30 @@
 use crate::elf::Function;
 use object::{File, Object, ObjectSection};
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::PathBuf;
 use std::{borrow, path};
 
 pub struct DwarfParser {
     obj: File<'static>,
-    lines: HashMap<u64, (PathBuf, usize)>,
-    line_to_addr:  HashMap<usize, Vec<u64>>,
+    addr_to_line: HashMap<Range<u64>, (PathBuf, usize)>,
+    line_to_addr: HashMap<usize, Vec<Range<u64>>>,
 }
 
 pub struct FunctionDebugInfo {
     path: PathBuf,
-    addr_to_line: HashMap<u64, usize>,       // addr -> line
-    line_to_addrs: HashMap<usize, Vec<u64>>, // addr -> line
+    addr_to_line: HashMap<Range<u64>, usize>, // addr -> line
+    line_to_addrs: HashMap<usize, Vec<Range<u64>>>, // line -> addr
 }
 
 impl FunctionDebugInfo {
-    pub(crate) fn new(data: (PathBuf, HashMap<u64, usize>, HashMap<usize, Vec<u64>>)) -> Self {
+    pub(crate) fn new(
+        data: (
+            PathBuf,
+            HashMap<Range<u64>, usize>,
+            HashMap<usize, Vec<Range<u64>>>,
+        ),
+    ) -> Self {
         Self {
             path: data.0,
             addr_to_line: data.1,
@@ -25,12 +32,12 @@ impl FunctionDebugInfo {
         }
     }
 
-    pub fn line_to_addrs(&self, line: usize) -> Option<&Vec<u64>> {
+    pub fn line_to_addrs(&self, line: usize) -> Option<&Vec<Range<u64>>> {
         self.line_to_addrs.get(&line)
     }
 
     pub fn line_by_addr(&self, addr: u64) -> Option<&usize> {
-        self.addr_to_line.get(&addr)
+        Some(self.addr_to_line.iter().find(|x| x.0.contains(&addr))?.1)
     }
 
     pub fn file_name(&self) -> &PathBuf {
@@ -52,17 +59,23 @@ impl FunctionDebugInfo {
 
 impl DwarfParser {
     pub fn function_data(&self, f: &Function) -> Option<FunctionDebugInfo> {
-        let pb = self.lines.get(&f.addr())?;
+        use std::fs::write;
+
+        write(
+            "test.log",
+            format!("{:?}\n\n{:?}", self.line_to_addr, f.addr()),
+        );
+        let pb = self.addr_to_line.iter().find(|x| x.0.contains(&f.addr()))?;
 
         let addr_to_line: HashMap<_, _> = self
-            .lines
+            .addr_to_line
             .iter()
-            .filter(|x| *x.0 >= f.addr() && *x.0 <= f.addr() + f.size() as u64)
-            .map(|x| (*x.0, x.1 .1))
+            .filter(|x| x.0.start >= f.addr() && x.0.end <= f.addr() + f.size() as u64)
+            .map(|x| (x.0.clone(), x.1 .1))
             .collect();
 
         Some(FunctionDebugInfo::new((
-            pb.0.clone(),
+            pb.1 .0.clone(),
             addr_to_line,
             self.line_to_addr.clone(),
         )))
@@ -71,7 +84,9 @@ impl DwarfParser {
     pub fn new(data: &'static [u8]) -> Option<Self> {
         let obj = File::parse(data).ok()?;
         let mut addr_to_line = HashMap::new();
-        let mut line_to_addr: HashMap<usize, Vec<u64>> = HashMap::new();
+        let mut line_to_addr: HashMap<usize, Vec<Range<u64>>> = HashMap::new();
+
+        let mut tmp = Vec::new();
 
         let load_section = |id: gimli::SectionId| -> Result<borrow::Cow<[u8]>, gimli::Error> {
             match obj.section_by_name(id.name()) {
@@ -151,21 +166,28 @@ impl DwarfParser {
                             None => 0,
                         };
 
-                        addr_to_line.insert(row.address(), (path, line as usize));
-
-                        if let Some(addrs) = line_to_addr.get_mut(&(line as usize)) {
-                            addrs.push(row.address() as u64);
-                        } else {
-                            line_to_addr.insert(line as usize, vec![row.address() as u64]);
-                        }
+                        tmp.push(((path, line as usize), row.address()));
                     }
                 }
             }
         }
 
+        // TODO: refactor it one day, please....
+        for i in tmp.as_slice().windows(2) {
+            addr_to_line.insert(i[0].1..i[1].1, i[0].0.clone());
+
+            if let Some(line) = line_to_addr.get_mut(&i[0].0 .1) {
+                line.push(i[0].1..i[1].1);
+            } else {
+                line_to_addr.insert(i[0].0 .1, vec![(i[0].1..i[1].1)]);
+            }
+        }
+
+        use std::fs::write;
+
         Some(Self {
             obj,
-            lines: addr_to_line,
+            addr_to_line,
             line_to_addr,
         })
     }

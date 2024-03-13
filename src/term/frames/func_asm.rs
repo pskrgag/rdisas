@@ -64,14 +64,7 @@ impl FuncAsm {
             name: (*f.name()).clone(),
             string_list: code
                 .iter()
-                .map(|i| {
-                    Self::inst_to_string(
-                        cs,
-                        elf,
-                        i,
-                        elf.arch(),
-                    )
-                })
+                .map(|i| Self::inst_to_string(cs, elf, i, elf.arch()))
                 .collect(),
             insn_list: code,
             range_cleanup: None,
@@ -84,27 +77,31 @@ impl FuncAsm {
     fn debug_frame(d: &Option<FunctionDebugInfo>) -> Option<(Vec<Line<'static>>, usize)> {
         let di = d.as_ref()?;
         let mut v = Vec::new();
-        let (start, end) = di.line_range();
+        // let (start, end) = di.line_range();
 
         if let Some(file) = File::open(di.file_name()).ok() {
             let reader = BufReader::new(file);
-            let mut size = end - start;
+            // let mut size = end - start;
 
             // FIXME: Any idea how to get slice out of Lines?
-            for line in reader.lines().skip(start) {
+            for line in reader.lines().skip(0) {
                 let l = Line::from(line.ok()?);
 
                 // l.patch_style(STYLE_ARRAY[i % COLORS]);
                 v.push(l);
 
-                size -= 1;
-                if size == 0 {
-                    break;
-                }
+                // size -= 1;
+                // if size == 0 {
+                //     break;
+                // }
             }
         }
 
-        Some((v, start))
+        if v.len() != 0 {
+            Some((v, 0))
+        } else {
+            None
+        }
     }
 
     fn format_insn(i: &Insn) -> Vec<Span<'static>> {
@@ -195,12 +192,7 @@ impl FuncAsm {
         None
     }
 
-    fn inst_to_string(
-        c: &Capstone,
-        elf: &Elf,
-        inst: &Insn,
-        arch: Arch,
-    ) -> Text<'static> {
+    fn inst_to_string(c: &Capstone, elf: &Elf, inst: &Insn, arch: Arch) -> Text<'static> {
         let detail = c.insn_detail(inst);
         let line = if let Ok(d) = detail {
             let group = d.groups();
@@ -295,7 +287,7 @@ impl FuncAsm {
                     };
                     let addr_offset = text.iter().position(|c| *c == b' ').unwrap();
 
-                    if self.insn_list[idx].address() == addr {
+                    if self.insn_list[idx].address() != addr {
                         for j in addr_offset + 5..text.len() {
                             if text[j] != b' ' {
                                 break;
@@ -332,7 +324,7 @@ impl FuncAsm {
                                     } else {
                                         (
                                             Range {
-                                                start: idx + 1,
+                                                start: idx,
                                                 end: i + 1,
                                             },
                                             addr_offset,
@@ -383,12 +375,14 @@ impl FuncAsm {
                 self.marked.0.push(line);
             }
 
-            let addr = di.line_to_addrs(*line_orig);
-            for i in addr.unwrap() {
+            let addrs = di.line_to_addrs(*line_orig);
+            for i in addrs.unwrap() {
                 for (cnt, j) in &mut self.insn_list.iter().enumerate() {
-                    if j.address() == *i {
+                    if i.contains(&j.address()) {
                         self.string_list[cnt].patch_style(STYLE_ARRAY[0]);
                         self.marked.1.push(cnt);
+                    } else if j.address() == addr {
+                        std::fs::write("addr.log", format!("{}", addr));
                     }
                 }
             }
