@@ -59,12 +59,6 @@ impl FunctionDebugInfo {
 
 impl DwarfParser {
     pub fn function_data(&self, f: &Function) -> Option<FunctionDebugInfo> {
-        use std::fs::write;
-
-        write(
-            "test.log",
-            format!("{:?}\n\n{:?}", self.line_to_addr, f.addr()),
-        );
         let pb = self.addr_to_line.iter().find(|x| x.0.contains(&f.addr()))?;
 
         let addr_to_line: HashMap<_, _> = self

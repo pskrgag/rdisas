@@ -371,8 +371,8 @@ impl FuncAsm {
 
         if let Some(d) = &mut self.debug_info {
             if d.0.len() > line {
-                d.0[line].patch_style(STYLE_ARRAY[0]);
-                self.marked.0.push(line);
+                d.0[line - 1].patch_style(STYLE_ARRAY[0]);
+                self.marked.0.push(line - 1);
             }
 
             let addrs = di.line_to_addrs(*line_orig);
@@ -381,8 +381,6 @@ impl FuncAsm {
                     if i.contains(&j.address()) {
                         self.string_list[cnt].patch_style(STYLE_ARRAY[0]);
                         self.marked.1.push(cnt);
-                    } else if j.address() == addr {
-                        std::fs::write("addr.log", format!("{}", addr));
                     }
                 }
             }
@@ -423,7 +421,17 @@ impl ScreenItem for FuncAsm {
     }
 
     fn second_frame(&self) -> Option<Paragraph> {
-        Some(Paragraph::new(self.debug_info.as_ref()?.0.clone()))
+        Some(Paragraph::new(if self.marked.0.len() == 0 {
+            self.debug_info.as_ref()?.0.clone()
+        } else {
+            let line = if self.marked.0[0] < 5 {
+                self.marked.0[0]
+            } else {
+                self.marked.0[0] - 5
+            };
+
+            (&self.debug_info.as_ref()?.0.clone()[line..]).to_vec()
+        }))
     }
 
     fn go_in(
