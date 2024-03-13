@@ -15,10 +15,10 @@ pub fn render(app: &mut App, f: &mut Frame) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref());
+        .constraints([Constraint::Percentage(96), Constraint::Percentage(4)].as_ref());
     let bottom_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
+        .constraints([Constraint::Percentage(100)].as_ref());
     let upper_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
@@ -64,10 +64,10 @@ pub fn render(app: &mut App, f: &mut Frame) {
         }
     }
 
-    {
-        let debug = crate::dump_logger!();
-        f.render_widget(debug, chunks_bottom[1]);
-    }
+    // {
+    //     let debug = crate::dump_logger!();
+    //     f.render_widget(debug, chunks_bottom[1]);
+    // }
 
     let cmd = app.cmd.dump();
 
